@@ -18,6 +18,21 @@ class ManagementViewTests(TestCase):
         self.assertContains(response, reverse("student-tab-list"))
         self.assertContains(response, reverse("inventory-item-list"))
 
+    def test_anonymous_user_can_reach_login_page(self):
+        self.client.logout()
+
+        response = self.client.get(reverse("login"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Login")
+
+    def test_protected_pages_redirect_to_login(self):
+        self.client.logout()
+
+        response = self.client.get(reverse("student-tab-list"))
+
+        self.assertRedirects(response, f"{reverse('login')}?next={reverse('student-tab-list')}")
+
     def test_student_tab_list_shows_tabs_and_create_link(self):
         StudentTab.objects.create(student_id="12345678", first_name="Alex", last_name="Student")
 

@@ -30,6 +30,14 @@
       <a href="{% url 'student-tab-list' %}">Student Tabs</a>
       <a href="{% url 'inventory-item-list' %}">Inventory</a>
       <a href="/admin/">Django Admin</a>
+      {% if user.is_authenticated %}
+        <form method="post" action="{% url 'logout' %}" style="display:inline">
+          {% csrf_token %}
+          <button type="submit">Logout</button>
+        </form>
+      {% else %}
+        <a href="{% url 'login' %}">Login</a>
+      {% endif %}
     </nav>
   </header>
   <main>
