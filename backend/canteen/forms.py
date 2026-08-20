@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import InventoryItem, StudentTab
+from .models import InventoryItem, Sale, StudentTab
 
 
 class StudentTabForm(forms.ModelForm):
@@ -37,3 +37,25 @@ class InventoryItemForm(forms.ModelForm):
         widgets = {
             "notes": forms.Textarea(attrs={"rows": 3}),
         }
+
+
+class NewSaleForm(forms.Form):
+    student_tab = forms.ModelChoiceField(
+        queryset=StudentTab.objects.none(),
+        label="Student tab",
+    )
+    item = forms.ModelChoiceField(
+        queryset=InventoryItem.objects.none(),
+        label="Item",
+    )
+    quantity = forms.IntegerField(min_value=1, initial=1)
+    payment_method = forms.ChoiceField(choices=Sale.PaymentMethod.choices)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["student_tab"].queryset = StudentTab.objects.filter(is_active=True).order_by(
+            "student_id"
+        )
+        self.fields["item"].queryset = InventoryItem.objects.filter(
+            is_active=True, quantity_on_hand__gt=0
+        ).order_by("name")

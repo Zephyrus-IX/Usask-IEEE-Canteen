@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import InventoryItem, StudentTab
+from .models import InventoryItem, Sale, StudentTab
 
 
 class ManagementViewTests(TestCase):
@@ -15,6 +15,7 @@ class ManagementViewTests(TestCase):
     def test_home_links_to_student_tabs_and_inventory(self):
         response = self.client.get(reverse("home"))
 
+        self.assertContains(response, reverse("new-sale"))
         self.assertContains(response, reverse("student-tab-list"))
         self.assertContains(response, reverse("inventory-item-list"))
 
@@ -94,3 +95,57 @@ class ManagementViewTests(TestCase):
         item = InventoryItem.objects.get(name="Coke")
         self.assertEqual(item.quantity_on_hand, 24)
         self.assertEqual(item.member_price, Decimal("1.25"))
+
+    def test_new_sale_page_requires_login(self):
+        self.client.logout()
+
+        response = self.client.get(reverse("new-sale"))
+
+        self.assertRedirects(response, f"{reverse('login')}?next={reverse('new-sale')}")
+
+    def test_new_sale_page_shows_active_tabs_and_inventory(self):
+        StudentTab.objects.create(student_id="12345678", first_name="Alex", last_name="Student")
+        InventoryItem.objects.create(
+            name="Coke",
+            quantity_on_hand=10,
+            member_price=Decimal("1.25"),
+            non_member_price=Decimal("1.50"),
+        )
+
+        response = self.client.get(reverse("new-sale"))
+
+        self.assertContains(response, "New Sale")
+        self.assertContains(response, "12345678 - Alex Student")
+        self.assertContains(response, "Coke")
+
+    def test_create_cash_sale_from_web_form(self):
+        tab = StudentTab.objects.create(
+            student_id="12345678",
+            first_name="Alex",
+            last_name="Student",
+            is_ieee_member=True,
+            ieee_membership_expires_on="2099-12-31",
+        )
+        item = InventoryItem.objects.create(
+            name="Coke",
+            quantity_on_hand=10,
+            member_price=Decimal("1.25"),
+            non_member_price=Decimal("1.50"),
+        )
+
+        response = self.client.post(
+            reverse("new-sale"),
+            {
+                "student_tab": str(tab.pk),
+                "payment_method": Sale.PaymentMethod.CASH,
+                "item": str(item.pk),
+                "quantity": "2",
+            },
+        )
+
+        self.assertRedirects(response, reverse("new-sale"))
+        item.refresh_from_db()
+        sale = Sale.objects.get()
+        self.assertEqual(sale.total_amount, Decimal("2.50"))
+        self.assertEqual(sale.status, Sale.Status.PAID)
+        self.assertEqual(item.quantity_on_hand, 8)

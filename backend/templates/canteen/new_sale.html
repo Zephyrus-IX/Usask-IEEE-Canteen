@@ -1,0 +1,20 @@
+{% extends "canteen/base.html" %}
+
+{% block title %}New Sale · Usask IEEE Canteen{% endblock %}
+
+{% block content %}
+  <h1>New Sale</h1>
+  <p class="muted">MVP sale flow: one student tab, one item line, one payment method.</p>
+
+  {% if messages %}
+    {% for message in messages %}
+      <p>{{ message }}</p>
+    {% endfor %}
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Complete sale</button>
+  </form>
+{% endblock %}
