@@ -4,7 +4,15 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import BalanceTransaction, InventoryItem, RestockEvent, RestockTaxLine, Sale, StudentTab, TaxRate
+from .models import (
+    BalanceTransaction,
+    InventoryItem,
+    RestockEvent,
+    RestockTaxLine,
+    Sale,
+    StudentTab,
+    TaxRate,
+)
 
 
 class ManagementViewTests(TestCase):
@@ -18,6 +26,7 @@ class ManagementViewTests(TestCase):
         self.assertContains(response, reverse("new-sale"))
         self.assertContains(response, reverse("load-balance"))
         self.assertContains(response, reverse("restock-create"))
+        self.assertContains(response, reverse("reports"))
         self.assertContains(response, reverse("student-tab-list"))
         self.assertContains(response, reverse("inventory-item-list"))
 
@@ -288,3 +297,97 @@ class ManagementViewTests(TestCase):
         self.assertEqual(restock.total_tax, Decimal("4.18"))
         self.assertEqual(restock.total_paid, Decimal("42.18"))
         self.assertEqual(RestockTaxLine.objects.filter(restock_event=restock).count(), 2)
+
+    def test_reports_page_requires_login(self):
+        self.client.logout()
+
+        response = self.client.get(reverse("reports"))
+
+        self.assertRedirects(response, f"{reverse('login')}?next={reverse('reports')}")
+
+    def test_reports_page_links_to_csv_exports(self):
+        response = self.client.get(reverse("reports"))
+
+        self.assertContains(response, "Reports")
+        self.assertContains(response, reverse("export-sales-csv"))
+        self.assertContains(response, reverse("export-balance-loads-csv"))
+        self.assertContains(response, reverse("export-restocks-csv"))
+        self.assertContains(response, reverse("export-inventory-csv"))
+        self.assertContains(response, reverse("export-student-tabs-csv"))
+
+    def test_sales_csv_export(self):
+        tab = StudentTab.objects.create(student_id="12345678", first_name="Alex", last_name="Student")
+        item = InventoryItem.objects.create(
+            name="Coke",
+            quantity_on_hand=10,
+            member_price=Decimal("1.25"),
+            non_member_price=Decimal("1.50"),
+        )
+        self.client.post(
+            reverse("new-sale"),
+            {
+                "student_tab": str(tab.pk),
+                "payment_method": Sale.PaymentMethod.CASH,
+                "item_1": str(item.pk),
+                "quantity_1": "2",
+            },
+        )
+
+        response = self.client.get(reverse("export-sales-csv"))
+
+        self.assertEqual(response["Content-Type"], "text/csv")
+        content = response.content.decode()
+        self.assertIn("sale_id,created_at,student_id,student_name,payment_method,status,total_amount", content)
+        self.assertIn("12345678", content)
+        self.assertIn("3.00", content)
+
+    def test_balance_loads_csv_export(self):
+        tab = StudentTab.objects.create(student_id="12345678", first_name="Alex", last_name="Student")
+        BalanceTransaction.objects.create(
+            student_tab=tab,
+            transaction_type=BalanceTransaction.TransactionType.LOAD,
+            payment_method=BalanceTransaction.PaymentMethod.CASH,
+            amount=Decimal("20.00"),
+        )
+
+        response = self.client.get(reverse("export-balance-loads-csv"))
+
+        self.assertEqual(response["Content-Type"], "text/csv")
+        content = response.content.decode()
+        self.assertIn("transaction_id,created_at,student_id,student_name,payment_method,amount,note", content)
+        self.assertIn("20.00", content)
+
+    def test_inventory_csv_export(self):
+        InventoryItem.objects.create(
+            name="Coke",
+            quantity_on_hand=10,
+            member_price=Decimal("1.25"),
+            non_member_price=Decimal("1.50"),
+        )
+
+        response = self.client.get(reverse("export-inventory-csv"))
+
+        self.assertEqual(response["Content-Type"], "text/csv")
+        content = response.content.decode()
+        self.assertIn("name,quantity_on_hand,member_price,non_member_price,low_stock_threshold,is_active", content)
+        self.assertIn("Coke", content)
+
+    def test_student_tabs_csv_export(self):
+        StudentTab.objects.create(student_id="12345678", first_name="Alex", last_name="Student")
+
+        response = self.client.get(reverse("export-student-tabs-csv"))
+
+        self.assertEqual(response["Content-Type"], "text/csv")
+        content = response.content.decode()
+        self.assertIn("student_id,first_name,last_name,is_active,is_ieee_member", content)
+        self.assertIn("12345678", content)
+
+    def test_restocks_csv_export(self):
+        RestockEvent.objects.create(vendor="Costco", subtotal=Decimal("10.00"), total_tax=Decimal("1.10"), total_paid=Decimal("11.10"))
+
+        response = self.client.get(reverse("export-restocks-csv"))
+
+        self.assertEqual(response["Content-Type"], "text/csv")
+        content = response.content.decode()
+        self.assertIn("restock_id,restocked_on,vendor,subtotal,total_tax,total_paid", content)
+        self.assertIn("Costco", content)

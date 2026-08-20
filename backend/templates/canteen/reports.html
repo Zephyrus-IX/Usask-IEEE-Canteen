@@ -1,0 +1,16 @@
+{% extends "canteen/base.html" %}
+
+{% block title %}Reports · Usask IEEE Canteen{% endblock %}
+
+{% block content %}
+  <h1>Reports</h1>
+  <p class="muted">Download CSV records for finance, inventory, and council tracking.</p>
+
+  <section class="cards">
+    <a class="card" href="{% url 'export-sales-csv' %}">Export Sales CSV</a>
+    <a class="card" href="{% url 'export-balance-loads-csv' %}">Export Balance Loads CSV</a>
+    <a class="card" href="{% url 'export-restocks-csv' %}">Export Restocks CSV</a>
+    <a class="card" href="{% url 'export-inventory-csv' %}">Export Inventory CSV</a>
+    <a class="card" href="{% url 'export-student-tabs-csv' %}">Export Student Tabs CSV</a>
+  </section>
+{% endblock %}
