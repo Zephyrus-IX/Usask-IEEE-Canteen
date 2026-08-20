@@ -1,29 +1,17 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Usask IEEE Canteen</title>
-  <style>
-    body { font-family: system-ui, sans-serif; margin: 2rem; line-height: 1.5; }
-    main { max-width: 760px; }
-    .nav { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin-top: 1.5rem; }
-    .card { border: 1px solid #ddd; border-radius: 0.75rem; padding: 1rem; background: #fafafa; }
-  </style>
-</head>
-<body>
-  <main>
-    <h1>Usask IEEE Canteen</h1>
-    <p>Prototype skeleton is running.</p>
-    <section class="nav" aria-label="MVP navigation preview">
-      <div class="card">New Sale</div>
-      <div class="card">Student Tabs</div>
-      <div class="card">Inventory</div>
-      <div class="card">Restocks</div>
-      <div class="card">Reports</div>
-      <div class="card">Settings</div>
-    </section>
-    <p><a href="/admin/">Django admin</a></p>
-  </main>
-</body>
-</html>
+{% extends "canteen/base.html" %}
+
+{% block title %}Usask IEEE Canteen{% endblock %}
+
+{% block content %}
+  <h1>Usask IEEE Canteen</h1>
+  <p>Plain functional prototype dashboard.</p>
+
+  <section class="cards" aria-label="MVP navigation preview">
+    <a class="card" href="#">New Sale <span class="muted">coming next</span></a>
+    <a class="card" href="{% url 'student-tab-list' %}">Student Tabs</a>
+    <a class="card" href="{% url 'inventory-item-list' %}">Inventory</a>
+    <a class="card" href="#">Restocks <span class="muted">coming later</span></a>
+    <a class="card" href="#">Reports <span class="muted">coming later</span></a>
+    <a class="card" href="/admin/">Settings/Admin</a>
+  </section>
+{% endblock %}

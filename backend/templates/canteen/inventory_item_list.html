@@ -1,0 +1,36 @@
+{% extends "canteen/base.html" %}
+
+{% block title %}Inventory · Usask IEEE Canteen{% endblock %}
+
+{% block content %}
+  <h1>Inventory</h1>
+  <p class="muted">Each stocked product is tracked as its own inventory entry.</p>
+  <p class="actions"><a class="button" href="{% url 'inventory-item-create' %}">Create inventory item</a></p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Item</th>
+        <th>Quantity</th>
+        <th>Member price</th>
+        <th>Non-member price</th>
+        <th>Low stock threshold</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in inventory_items %}
+        <tr>
+          <td>{{ item.name }}</td>
+          <td>{{ item.quantity_on_hand }}</td>
+          <td>${{ item.member_price }}</td>
+          <td>${{ item.non_member_price }}</td>
+          <td>{{ item.low_stock_threshold }}</td>
+          <td>{% if item.is_active %}Active{% else %}Inactive{% endif %}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6">No inventory items yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

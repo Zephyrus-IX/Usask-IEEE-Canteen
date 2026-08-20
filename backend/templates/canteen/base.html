@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Usask IEEE Canteen{% endblock %}</title>
+  <style>
+    :root { color-scheme: light; --border: #ddd; --muted: #666; --bg: #fafafa; }
+    body { font-family: system-ui, sans-serif; margin: 0; line-height: 1.5; color: #111; }
+    header { border-bottom: 1px solid var(--border); padding: 1rem 2rem; background: var(--bg); }
+    main { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+    nav { display: flex; gap: 1rem; flex-wrap: wrap; }
+    nav a, .button { display: inline-block; border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.5rem 0.75rem; text-decoration: none; color: #111; background: white; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { border-bottom: 1px solid var(--border); padding: 0.6rem; text-align: left; }
+    th { background: var(--bg); }
+    .muted { color: var(--muted); }
+    .cards { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-top: 1.5rem; }
+    .card { border: 1px solid var(--border); border-radius: 0.75rem; padding: 1rem; background: var(--bg); }
+    form p { max-width: 520px; display: grid; gap: 0.25rem; }
+    input, textarea, select { font: inherit; padding: 0.45rem; }
+    button { font: inherit; padding: 0.6rem 0.9rem; }
+    .actions { margin: 1rem 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <strong><a href="{% url 'home' %}">Usask IEEE Canteen</a></strong>
+    <nav aria-label="Main navigation">
+      <a href="{% url 'student-tab-list' %}">Student Tabs</a>
+      <a href="{% url 'inventory-item-list' %}">Inventory</a>
+      <a href="/admin/">Django Admin</a>
+    </nav>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{% extends "canteen/base.html" %}
+
+{% block title %}Create Student Tab · Usask IEEE Canteen{% endblock %}
+
+{% block content %}
+  <h1>Create Student Tab</h1>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Save student tab</button>
+    <a class="button" href="{% url 'student-tab-list' %}">Cancel</a>
+  </form>
+{% endblock %}

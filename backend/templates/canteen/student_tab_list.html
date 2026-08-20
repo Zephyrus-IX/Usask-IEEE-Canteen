@@ -1,0 +1,42 @@
+{% extends "canteen/base.html" %}
+
+{% block title %}Student Tabs · Usask IEEE Canteen{% endblock %}
+
+{% block content %}
+  <h1>Student Tabs</h1>
+  <p class="muted">Every sale must be attached to an active student tab.</p>
+  <p class="actions"><a class="button" href="{% url 'student-tab-create' %}">Create student tab</a></p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Student ID</th>
+        <th>Name</th>
+        <th>Status</th>
+        <th>IEEE membership</th>
+        <th>Balance</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for tab in student_tabs %}
+        <tr>
+          <td>{{ tab.student_id }}</td>
+          <td>{{ tab.first_name }} {{ tab.last_name }}</td>
+          <td>{% if tab.is_active %}Active{% else %}Inactive{% endif %}</td>
+          <td>
+            {% if tab.has_active_ieee_discount %}
+              Active member discount
+            {% elif tab.is_ieee_member %}
+              Member expired/no discount
+            {% else %}
+              Non-member
+            {% endif %}
+          </td>
+          <td>${{ tab.current_balance }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5">No student tabs yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}
