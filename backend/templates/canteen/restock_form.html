@@ -1,0 +1,45 @@
+{% extends "canteen/base.html" %}
+
+{% block title %}New Restock · Usask IEEE Canteen{% endblock %}
+
+{% block content %}
+  <h1>New Restock</h1>
+  <p class="muted">Enter a restock receipt. Taxes are auto-calculated from selected active tax rates.</p>
+
+  {% if messages %}
+    {% for message in messages %}
+      <p>{{ message }}</p>
+    {% endfor %}
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <p>{{ form.vendor.label_tag }} {{ form.vendor }}</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>Quantity</th>
+          <th>Pre-tax subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item_field, quantity_field, subtotal_field in form.item_rows %}
+          <tr>
+            <td>{{ item_field.errors }} {{ item_field }}</td>
+            <td>{{ quantity_field.errors }} {{ quantity_field }}</td>
+            <td>{{ subtotal_field.errors }} {{ subtotal_field }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <p>{{ form.tax_rates.label_tag }} {{ form.tax_rates }}</p>
+    <p>{{ form.notes.label_tag }} {{ form.notes }}</p>
+
+    <p><button type="submit">Record restock</button></p>
+  </form>
+{% endblock %}

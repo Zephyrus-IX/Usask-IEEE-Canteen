@@ -6,9 +6,9 @@ from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import CreateView, ListView
 
-from .forms import InventoryItemForm, LoadBalanceForm, NewSaleForm, StudentTabForm
+from .forms import InventoryItemForm, LoadBalanceForm, NewSaleForm, RestockForm, StudentTabForm
 from .models import InventoryItem, StudentTab
-from .services import create_sale, load_student_balance
+from .services import create_sale, load_student_balance, record_restock
 
 
 def home(request):
@@ -61,6 +61,31 @@ class LoadBalanceView(LoginRequiredMixin, View):
             else:
                 messages.success(request, f"Loaded ${transaction.amount} onto {transaction.student_tab}")
                 return redirect("load-balance")
+        return render(request, self.template_name, {"form": form})
+
+
+class RestockCreateView(LoginRequiredMixin, View):
+    template_name = "canteen/restock_form.html"
+
+    def get(self, request):
+        return render(request, self.template_name, {"form": RestockForm()})
+
+    def post(self, request):
+        form = RestockForm(request.POST)
+        if form.is_valid():
+            try:
+                restock = record_restock(
+                    vendor=form.cleaned_data["vendor"],
+                    items=form.cleaned_data["items"],
+                    tax_rates=list(form.cleaned_data["tax_rates"]),
+                    entered_by=request.user,
+                    notes=form.cleaned_data["notes"],
+                )
+            except ValidationError as exc:
+                form.add_error(None, exc)
+            else:
+                messages.success(request, f"Restock #{restock.pk} recorded: ${restock.total_paid}")
+                return redirect("restock-create")
         return render(request, self.template_name, {"form": form})
 
 

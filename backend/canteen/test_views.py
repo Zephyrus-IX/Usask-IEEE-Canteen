@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import BalanceTransaction, InventoryItem, Sale, StudentTab
+from .models import BalanceTransaction, InventoryItem, RestockEvent, RestockTaxLine, Sale, StudentTab, TaxRate
 
 
 class ManagementViewTests(TestCase):
@@ -17,6 +17,7 @@ class ManagementViewTests(TestCase):
 
         self.assertContains(response, reverse("new-sale"))
         self.assertContains(response, reverse("load-balance"))
+        self.assertContains(response, reverse("restock-create"))
         self.assertContains(response, reverse("student-tab-list"))
         self.assertContains(response, reverse("inventory-item-list"))
 
@@ -223,3 +224,67 @@ class ManagementViewTests(TestCase):
         self.assertEqual(transaction.transaction_type, BalanceTransaction.TransactionType.LOAD)
         self.assertEqual(transaction.handled_by, self.user)
         self.assertEqual(tab.current_balance, Decimal("20.00"))
+
+    def test_restock_page_requires_login(self):
+        self.client.logout()
+
+        response = self.client.get(reverse("restock-create"))
+
+        self.assertRedirects(response, f"{reverse('login')}?next={reverse('restock-create')}")
+
+    def test_restock_page_shows_items_and_active_taxes(self):
+        InventoryItem.objects.create(
+            name="Coke",
+            quantity_on_hand=10,
+            member_price=Decimal("1.25"),
+            non_member_price=Decimal("1.50"),
+        )
+        TaxRate.objects.create(name="GST", rate_percent=Decimal("5.000"))
+
+        response = self.client.get(reverse("restock-create"))
+
+        self.assertContains(response, "New Restock")
+        self.assertContains(response, "Coke")
+        self.assertContains(response, "GST")
+
+    def test_create_restock_from_web_form(self):
+        coke = InventoryItem.objects.create(
+            name="Coke",
+            quantity_on_hand=10,
+            member_price=Decimal("1.25"),
+            non_member_price=Decimal("1.50"),
+        )
+        chips = InventoryItem.objects.create(
+            name="Chips",
+            quantity_on_hand=5,
+            member_price=Decimal("1.50"),
+            non_member_price=Decimal("2.00"),
+        )
+        gst = TaxRate.objects.create(name="GST", rate_percent=Decimal("5.000"))
+        pst = TaxRate.objects.create(name="PST", rate_percent=Decimal("6.000"))
+
+        response = self.client.post(
+            reverse("restock-create"),
+            {
+                "vendor": "Costco",
+                "item_1": str(coke.pk),
+                "quantity_1": "24",
+                "line_subtotal_1": "18.00",
+                "item_2": str(chips.pk),
+                "quantity_2": "10",
+                "line_subtotal_2": "20.00",
+                "tax_rates": [str(gst.pk), str(pst.pk)],
+                "notes": "Test receipt",
+            },
+        )
+
+        self.assertRedirects(response, reverse("restock-create"))
+        coke.refresh_from_db()
+        chips.refresh_from_db()
+        restock = RestockEvent.objects.get()
+        self.assertEqual(coke.quantity_on_hand, 34)
+        self.assertEqual(chips.quantity_on_hand, 15)
+        self.assertEqual(restock.subtotal, Decimal("38.00"))
+        self.assertEqual(restock.total_tax, Decimal("4.18"))
+        self.assertEqual(restock.total_paid, Decimal("42.18"))
+        self.assertEqual(RestockTaxLine.objects.filter(restock_event=restock).count(), 2)
