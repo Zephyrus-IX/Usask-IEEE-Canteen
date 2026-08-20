@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import InventoryItem, Sale, StudentTab
+from .models import BalanceTransaction, InventoryItem, Sale, StudentTab
 
 SALE_ITEM_ROW_COUNT = 5
 
@@ -39,6 +39,27 @@ class InventoryItemForm(forms.ModelForm):
         widgets = {
             "notes": forms.Textarea(attrs={"rows": 3}),
         }
+
+
+class LoadBalanceForm(forms.Form):
+    student_tab = forms.ModelChoiceField(
+        queryset=StudentTab.objects.none(),
+        label="Student tab",
+    )
+    amount = forms.DecimalField(min_value=0.01, max_digits=10, decimal_places=2)
+    payment_method = forms.ChoiceField(
+        choices=(
+            (BalanceTransaction.PaymentMethod.CASH, "Cash"),
+            (BalanceTransaction.PaymentMethod.CARD, "Card"),
+        )
+    )
+    note = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 3}))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["student_tab"].queryset = StudentTab.objects.filter(is_active=True).order_by(
+            "student_id"
+        )
 
 
 class NewSaleForm(forms.Form):

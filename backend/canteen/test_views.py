@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import InventoryItem, Sale, StudentTab
+from .models import BalanceTransaction, InventoryItem, Sale, StudentTab
 
 
 class ManagementViewTests(TestCase):
@@ -16,6 +16,7 @@ class ManagementViewTests(TestCase):
         response = self.client.get(reverse("home"))
 
         self.assertContains(response, reverse("new-sale"))
+        self.assertContains(response, reverse("load-balance"))
         self.assertContains(response, reverse("student-tab-list"))
         self.assertContains(response, reverse("inventory-item-list"))
 
@@ -187,3 +188,38 @@ class ManagementViewTests(TestCase):
         self.assertEqual(sale.total_amount, Decimal("5.00"))
         self.assertEqual(coke.quantity_on_hand, 8)
         self.assertEqual(chips.quantity_on_hand, 9)
+
+    def test_load_balance_page_requires_login(self):
+        self.client.logout()
+
+        response = self.client.get(reverse("load-balance"))
+
+        self.assertRedirects(response, f"{reverse('login')}?next={reverse('load-balance')}")
+
+    def test_load_balance_page_shows_active_tabs(self):
+        StudentTab.objects.create(student_id="12345678", first_name="Alex", last_name="Student")
+
+        response = self.client.get(reverse("load-balance"))
+
+        self.assertContains(response, "Load Student Balance")
+        self.assertContains(response, "12345678 - Alex Student")
+
+    def test_load_balance_from_web_form(self):
+        tab = StudentTab.objects.create(student_id="12345678", first_name="Alex", last_name="Student")
+
+        response = self.client.post(
+            reverse("load-balance"),
+            {
+                "student_tab": str(tab.pk),
+                "amount": "20.00",
+                "payment_method": BalanceTransaction.PaymentMethod.CASH,
+                "note": "Initial load",
+            },
+        )
+
+        self.assertRedirects(response, reverse("load-balance"))
+        transaction = BalanceTransaction.objects.get()
+        self.assertEqual(transaction.amount, Decimal("20.00"))
+        self.assertEqual(transaction.transaction_type, BalanceTransaction.TransactionType.LOAD)
+        self.assertEqual(transaction.handled_by, self.user)
+        self.assertEqual(tab.current_balance, Decimal("20.00"))

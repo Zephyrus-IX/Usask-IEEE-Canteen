@@ -1,0 +1,20 @@
+{% extends "canteen/base.html" %}
+
+{% block title %}Load Student Balance · Usask IEEE Canteen{% endblock %}
+
+{% block content %}
+  <h1>Load Student Balance</h1>
+  <p class="muted">Record a cash or card prepayment onto a student tab.</p>
+
+  {% if messages %}
+    {% for message in messages %}
+      <p>{{ message }}</p>
+    {% endfor %}
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Load balance</button>
+  </form>
+{% endblock %}

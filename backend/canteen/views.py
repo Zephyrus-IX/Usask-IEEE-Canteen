@@ -6,9 +6,9 @@ from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import CreateView, ListView
 
-from .forms import InventoryItemForm, NewSaleForm, StudentTabForm
+from .forms import InventoryItemForm, LoadBalanceForm, NewSaleForm, StudentTabForm
 from .models import InventoryItem, StudentTab
-from .services import create_sale
+from .services import create_sale, load_student_balance
 
 
 def home(request):
@@ -36,6 +36,31 @@ class NewSaleView(LoginRequiredMixin, View):
             else:
                 messages.success(request, f"Sale #{sale.pk} completed: ${sale.total_amount}")
                 return redirect("new-sale")
+        return render(request, self.template_name, {"form": form})
+
+
+class LoadBalanceView(LoginRequiredMixin, View):
+    template_name = "canteen/load_balance.html"
+
+    def get(self, request):
+        return render(request, self.template_name, {"form": LoadBalanceForm()})
+
+    def post(self, request):
+        form = LoadBalanceForm(request.POST)
+        if form.is_valid():
+            try:
+                transaction = load_student_balance(
+                    student_tab=form.cleaned_data["student_tab"],
+                    amount=form.cleaned_data["amount"],
+                    payment_method=form.cleaned_data["payment_method"],
+                    handled_by=request.user,
+                    note=form.cleaned_data["note"],
+                )
+            except ValidationError as exc:
+                form.add_error(None, exc)
+            else:
+                messages.success(request, f"Loaded ${transaction.amount} onto {transaction.student_tab}")
+                return redirect("load-balance")
         return render(request, self.template_name, {"form": form})
 
 
