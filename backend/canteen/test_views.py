@@ -138,8 +138,8 @@ class ManagementViewTests(TestCase):
             {
                 "student_tab": str(tab.pk),
                 "payment_method": Sale.PaymentMethod.CASH,
-                "item": str(item.pk),
-                "quantity": "2",
+                "item_1": str(item.pk),
+                "quantity_1": "2",
             },
         )
 
@@ -149,3 +149,41 @@ class ManagementViewTests(TestCase):
         self.assertEqual(sale.total_amount, Decimal("2.50"))
         self.assertEqual(sale.status, Sale.Status.PAID)
         self.assertEqual(item.quantity_on_hand, 8)
+
+    def test_create_multi_item_cash_sale_from_web_form(self):
+        tab = StudentTab.objects.create(student_id="12345678", first_name="Alex", last_name="Student")
+        coke = InventoryItem.objects.create(
+            name="Coke",
+            quantity_on_hand=10,
+            member_price=Decimal("1.25"),
+            non_member_price=Decimal("1.50"),
+        )
+        chips = InventoryItem.objects.create(
+            name="Chips",
+            quantity_on_hand=10,
+            member_price=Decimal("1.50"),
+            non_member_price=Decimal("2.00"),
+        )
+
+        response = self.client.post(
+            reverse("new-sale"),
+            {
+                "student_tab": str(tab.pk),
+                "payment_method": Sale.PaymentMethod.CASH,
+                "item_1": str(coke.pk),
+                "quantity_1": "2",
+                "item_2": str(chips.pk),
+                "quantity_2": "1",
+                "item_3": "",
+                "quantity_3": "",
+            },
+        )
+
+        self.assertRedirects(response, reverse("new-sale"))
+        coke.refresh_from_db()
+        chips.refresh_from_db()
+        sale = Sale.objects.get()
+        self.assertEqual(sale.items.count(), 2)
+        self.assertEqual(sale.total_amount, Decimal("5.00"))
+        self.assertEqual(coke.quantity_on_hand, 8)
+        self.assertEqual(chips.quantity_on_hand, 9)

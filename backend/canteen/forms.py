@@ -2,6 +2,8 @@ from django import forms
 
 from .models import InventoryItem, Sale, StudentTab
 
+SALE_ITEM_ROW_COUNT = 5
+
 
 class StudentTabForm(forms.ModelForm):
     class Meta:
@@ -44,11 +46,6 @@ class NewSaleForm(forms.Form):
         queryset=StudentTab.objects.none(),
         label="Student tab",
     )
-    item = forms.ModelChoiceField(
-        queryset=InventoryItem.objects.none(),
-        label="Item",
-    )
-    quantity = forms.IntegerField(min_value=1, initial=1)
     payment_method = forms.ChoiceField(choices=Sale.PaymentMethod.choices)
 
     def __init__(self, *args, **kwargs):
@@ -56,6 +53,41 @@ class NewSaleForm(forms.Form):
         self.fields["student_tab"].queryset = StudentTab.objects.filter(is_active=True).order_by(
             "student_id"
         )
-        self.fields["item"].queryset = InventoryItem.objects.filter(
-            is_active=True, quantity_on_hand__gt=0
-        ).order_by("name")
+        item_queryset = InventoryItem.objects.filter(is_active=True, quantity_on_hand__gt=0).order_by(
+            "name"
+        )
+        for row_number in range(1, SALE_ITEM_ROW_COUNT + 1):
+            self.fields[f"item_{row_number}"] = forms.ModelChoiceField(
+                queryset=item_queryset,
+                label=f"Item {row_number}",
+                required=False,
+            )
+            self.fields[f"quantity_{row_number}"] = forms.IntegerField(
+                min_value=1,
+                label="Qty",
+                required=False,
+            )
+
+    @property
+    def item_rows(self):
+        return [
+            (self[f"item_{row_number}"], self[f"quantity_{row_number}"])
+            for row_number in range(1, SALE_ITEM_ROW_COUNT + 1)
+        ]
+
+    def clean(self):
+        cleaned_data = super().clean()
+        items = []
+        for row_number in range(1, SALE_ITEM_ROW_COUNT + 1):
+            item = cleaned_data.get(f"item_{row_number}")
+            quantity = cleaned_data.get(f"quantity_{row_number}")
+            if item and not quantity:
+                self.add_error(f"quantity_{row_number}", "Enter a quantity for this item.")
+            elif quantity and not item:
+                self.add_error(f"item_{row_number}", "Select an item for this quantity.")
+            elif item and quantity:
+                items.append({"inventory_item": item, "quantity": quantity})
+        if not items:
+            raise forms.ValidationError("Sale must contain at least one item.")
+        cleaned_data["items"] = items
+        return cleaned_data

@@ -27,12 +27,7 @@ class NewSaleView(LoginRequiredMixin, View):
             try:
                 sale = create_sale(
                     student_tab=form.cleaned_data["student_tab"],
-                    items=[
-                        {
-                            "inventory_item": form.cleaned_data["item"],
-                            "quantity": form.cleaned_data["quantity"],
-                        }
-                    ],
+                    items=form.cleaned_data["items"],
                     payment_method=form.cleaned_data["payment_method"],
                     handled_by=request.user,
                 )
