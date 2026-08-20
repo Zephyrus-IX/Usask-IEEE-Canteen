@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-canteen}
+      POSTGRES_USER: ${POSTGRES_USER:-canteen}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-canteen-dev-password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-canteen} -d ${POSTGRES_DB:-canteen}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: ./backend
+    command: python manage.py runserver 0.0.0.0:8000
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://canteen:canteen-dev-password@db:5432/canteen}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
