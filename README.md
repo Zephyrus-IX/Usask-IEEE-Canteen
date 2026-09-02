@@ -27,8 +27,21 @@ A self-hosted Docker app to manage and track inventory, in-person sales, student
 ```text
 backend/             Django project and canteen app
 compose.yaml         Local/self-hosted Docker Compose stack
-docs/                Design notes and MVP scope
+docs/                Design notes, deployment guide, and MVP scope
 .env.example         Example environment variables
+```
+
+## Deployment
+
+See [docs/initial-deployment.md](docs/initial-deployment.md) for first-deploy setup, database migrations, and Django admin account creation.
+
+Quick start:
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+docker compose exec web python manage.py migrate
+docker compose exec web python manage.py createsuperuser
 ```
 
 ## Development status
