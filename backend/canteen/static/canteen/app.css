@@ -149,8 +149,8 @@ h1 { margin: 0; font-size: clamp(2.35rem, 5vw, 4.4rem); line-height: .98; letter
 .hero-art::before {
   content: "";
   position: absolute;
-  inset: 7% 0 0 3%;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 720 330' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='b' x1='0' x2='1'%3E%3Cstop stop-color='%23b66d3c'/%3E%3Cstop offset='1' stop-color='%238b492d'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg opacity='.32' fill='none' stroke='%235d94c8' stroke-width='3'%3E%3Cpath d='M20 245c70-130 152-123 195-107 72 26 115-79 206-49 55 18 83 95 139 80 51-14 86-67 143-38'/%3E%3Cpath d='M70 80h74v172H70zM168 38h110v214H168zM300 96h72v156h-72z'/%3E%3C/g%3E%3Cg transform='translate(168 38)'%3E%3Cpath fill='url(%23b)' d='M50 72h360l22 180H24z'/%3E%3Cpath fill='%23cc8452' d='M86 0h250l36 78H50z'/%3E%3Cpath fill='%237b3929' d='M300 10h72v242h-72zM62 80h35v172H62z'/%3E%3Cpath fill='%23f0b071' d='M96 22h36v40H96zM150 22h36v40h-36zM204 22h36v40h-36zM96 103h42v38H96zM162 103h42v38h-42zM228 103h42v38h-42zM96 164h42v38H96zM162 164h42v38h-42zM228 164h42v38h-42zM320 54h26v44h-26zM320 126h28v42h-28z'/%3E%3Cpath fill='%23062354' opacity='.65' d='M96 103h42v38H96zM162 103h42v38h-42zM228 103h42v38h-42zM96 164h42v38H96zM162 164h42v38h-42zM228 164h42v38h-42zM320 54h26v44h-26zM320 126h28v42h-28z'/%3E%3C/g%3E%3Cg fill='%2385ad3d'%3E%3Ccircle cx='156' cy='218' r='42'/%3E%3Ccircle cx='550' cy='185' r='58'/%3E%3Ccircle cx='620' cy='230' r='34'/%3E%3C/g%3E%3Cg fill='%233d7d42'%3E%3Ccircle cx='124' cy='244' r='34'/%3E%3Ccircle cx='590' cy='220' r='43'/%3E%3C/g%3E%3Cg fill='%23807870'%3E%3Cellipse cx='180' cy='285' rx='64' ry='18'/%3E%3Cellipse cx='270' cy='292' rx='48' ry='15'/%3E%3C/g%3E%3C/svg%3E");
+  inset: 0 -4% -2% -2%;
+  background-image: url("mcnaughton-centre.png");
   background-repeat: no-repeat;
   background-position: center bottom;
   background-size: contain;

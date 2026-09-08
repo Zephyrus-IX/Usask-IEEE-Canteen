@@ -47,7 +47,6 @@ Source reference: AI-generated mockup provided 2026-09-08.
 ## Asset TODOs
 
 1. Add official IEEE Student Branch logo/wordmark if the branch has a usable SVG/PNG.
-2. Replace generated building art with either:
-   - an approved photo with watercolor/illustration treatment, or
-   - a hand-created SVG/illustration based on an approved reference.
+2. The homepage now uses `backend/canteen/static/canteen/mcnaughton-centre.png`, generated from the provided McNaughton Centre-style artwork.
+   - Replace it later only if an official branch-approved image/vector is required.
 3. Confirm whether `Load Balance` stays as its own dashboard card or is nested under `Student Tabs` later.
