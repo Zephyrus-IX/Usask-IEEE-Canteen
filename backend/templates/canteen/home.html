@@ -1,16 +1,15 @@
 {% extends "canteen/base.html" %}
+{% load static %}
 
 {% block title %}Usask IEEE Canteen{% endblock %}
 
 {% block content %}
   <section class="home-hero" aria-labelledby="home-title">
-    <div class="hero-copy">
-      <p class="eyebrow">University of Saskatchewan Engineering<br>Est. 1912 <span></span></p>
-      <h1 id="home-title">Usask IEEE Canteen</h1>
-      <p class="hero-subtitle">McNaughton Centre&nbsp;&nbsp;•&nbsp;&nbsp;USask IEEE Student Branch</p>
-      <div class="accent-bar" aria-hidden="true"></div>
-    </div>
-    <div class="hero-art" role="img" aria-label="Illustrated McNaughton Centre building"></div>
+    <h1 id="home-title" class="sr-only">Usask IEEE Canteen</h1>
+    <picture>
+      <source media="(max-aspect-ratio: 4/3)" srcset="{% static 'canteen/home-hero-mobile.png' %}">
+      <img class="hero-banner" src="{% static 'canteen/home-hero-wide.png' %}" alt="Usask IEEE Canteen at McNaughton Centre, USask IEEE Student Branch">
+    </picture>
   </section>
 
   <section class="dashboard-grid" aria-label="Canteen dashboard navigation">
