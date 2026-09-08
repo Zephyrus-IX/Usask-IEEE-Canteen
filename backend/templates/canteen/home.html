@@ -3,16 +3,78 @@
 {% block title %}Usask IEEE Canteen{% endblock %}
 
 {% block content %}
-  <h1>Usask IEEE Canteen</h1>
-  <p>Plain functional prototype dashboard.</p>
+  <section class="home-hero" aria-labelledby="home-title">
+    <div class="hero-copy">
+      <p class="eyebrow">University of Saskatchewan Engineering<br>Est. 1912 <span></span></p>
+      <h1 id="home-title">Usask IEEE Canteen</h1>
+      <p class="hero-subtitle">McNaughton Centre&nbsp;&nbsp;•&nbsp;&nbsp;USask IEEE Student Branch</p>
+      <div class="accent-bar" aria-hidden="true"></div>
+    </div>
+    <div class="hero-art" role="img" aria-label="Illustrated McNaughton Centre building"></div>
+  </section>
 
-  <section class="cards" aria-label="MVP navigation preview">
-    <a class="card" href="{% url 'new-sale' %}">New Sale</a>
-    <a class="card" href="{% url 'load-balance' %}">Load Balance</a>
-    <a class="card" href="{% url 'restock-create' %}">Restocks</a>
-    <a class="card" href="{% url 'student-tab-list' %}">Student Tabs</a>
-    <a class="card" href="{% url 'inventory-item-list' %}">Inventory</a>
-    <a class="card" href="{% url 'reports' %}">Reports</a>
-    <a class="card" href="/admin/">Settings/Admin</a>
+  <section class="dashboard-grid" aria-label="Canteen dashboard navigation">
+    <a class="nav-card is-featured" href="{% url 'new-sale' %}">
+      <div class="nav-card-copy">
+        <svg class="nav-card-icon" aria-hidden="true"><use href="#icon-cart"></use></svg>
+        <h2>New Sale</h2>
+        <p>Start a new purchase</p>
+      </div>
+      <span class="card-arrow" aria-hidden="true">›</span>
+    </a>
+
+    <a class="nav-card" href="{% url 'student-tab-list' %}">
+      <div class="nav-card-copy">
+        <svg class="nav-card-icon" aria-hidden="true"><use href="#icon-user"></use></svg>
+        <h2>Student Tabs</h2>
+        <p>Manage student accounts</p>
+      </div>
+      <span class="card-arrow" aria-hidden="true">›</span>
+    </a>
+
+    <a class="nav-card" href="{% url 'inventory-item-list' %}">
+      <div class="nav-card-copy">
+        <svg class="nav-card-icon" aria-hidden="true"><use href="#icon-cube"></use></svg>
+        <h2>Inventory</h2>
+        <p>View and manage stock</p>
+      </div>
+      <span class="card-arrow" aria-hidden="true">›</span>
+    </a>
+
+    <a class="nav-card" href="{% url 'load-balance' %}">
+      <div class="nav-card-copy">
+        <svg class="nav-card-icon" aria-hidden="true"><use href="#icon-wallet"></use></svg>
+        <h2>Load Balance</h2>
+        <p>Add prepaid tab funds</p>
+      </div>
+      <span class="card-arrow" aria-hidden="true">›</span>
+    </a>
+
+    <a class="nav-card" href="{% url 'restock-create' %}">
+      <div class="nav-card-copy">
+        <svg class="nav-card-icon" aria-hidden="true"><use href="#icon-truck"></use></svg>
+        <h2>Restocks</h2>
+        <p>Log and track restocks</p>
+      </div>
+      <span class="card-arrow" aria-hidden="true">›</span>
+    </a>
+
+    <a class="nav-card" href="{% url 'reports' %}">
+      <div class="nav-card-copy">
+        <svg class="nav-card-icon" aria-hidden="true"><use href="#icon-chart"></use></svg>
+        <h2>Reports</h2>
+        <p>View sales and canteen data</p>
+      </div>
+      <span class="card-arrow" aria-hidden="true">›</span>
+    </a>
+
+    <a class="nav-card" href="/admin/">
+      <div class="nav-card-copy">
+        <svg class="nav-card-icon" aria-hidden="true"><use href="#icon-gear"></use></svg>
+        <h2>Settings / Admin</h2>
+        <p>System configuration</p>
+      </div>
+      <span class="card-arrow" aria-hidden="true">›</span>
+    </a>
   </section>
 {% endblock %}
