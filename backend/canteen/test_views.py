@@ -69,6 +69,19 @@ class ManagementViewTests(TestCase):
         self.assertContains(response, "Student Number")
         self.assertContains(response, "vice-chair")
 
+    def test_login_without_next_redirects_to_canteen_home(self):
+        self.client.logout()
+        User.objects.create_user(username="admin", password="password", is_staff=True)
+
+        response = self.client.post(reverse("login"), {"username": "admin", "password": "password"})
+
+        self.assertRedirects(response, reverse("home"))
+
+    def test_canteen_logout_redirects_to_canteen_home(self):
+        response = self.client.post(reverse("logout"))
+
+        self.assertRedirects(response, reverse("home"))
+
     def test_protected_pages_redirect_to_login(self):
         self.client.logout()
 
