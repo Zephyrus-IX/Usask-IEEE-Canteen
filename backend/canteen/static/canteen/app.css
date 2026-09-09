@@ -36,16 +36,14 @@ a { color: inherit; }
   min-height: 100vh;
   margin: 0;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   border-radius: 0;
-  background:
-    linear-gradient(180deg, rgba(238,248,255,0.95) 0%, rgba(255,255,255,0.78) 46%, rgba(238,248,255,0.94) 74%, rgba(6,36,84,0.98) 74.5%, rgba(0,91,170,0.98) 100%);
+  background: linear-gradient(180deg, rgba(238,248,255,0.95) 0%, rgba(255,255,255,0.78) 62%, rgba(238,248,255,0.96) 100%);
   box-shadow: none;
 }
 .shell::before,
 .shell::after,
 .site-header::after,
-.site-footer::before,
 .nav-card::after {
   content: "";
   position: absolute;
@@ -113,7 +111,7 @@ a { color: inherit; }
 .nav-icon { width: 22px; height: 22px; fill: currentColor; flex: 0 0 auto; }
 .mobile-menu { display: none; margin-left: auto; font-size: 2rem; font-weight: 800; }
 
-main { position: relative; z-index: 2; padding: 0 42px 160px; }
+main { position: relative; z-index: 2; padding: 0 42px 56px; }
 .sr-only {
   position: absolute;
   width: 1px;
@@ -193,26 +191,18 @@ h1 { margin: 0; font-size: clamp(2.35rem, 5vw, 4.4rem); line-height: .98; letter
 .is-featured .card-arrow { background: rgba(0,151,220,.72); }
 
 .site-footer {
-  position: absolute;
-  inset: auto 0 0;
-  min-height: 152px;
+  position: relative;
+  min-height: 0;
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  padding: 38px 42px 30px;
+  flex-wrap: wrap;
+  gap: 22px 36px;
+  padding: 30px 42px;
   color: #fff;
-  overflow: hidden;
-}
-.site-footer::before {
-  inset: -34px 0 auto;
-  height: 82px;
-  opacity: 1;
-  background: none;
-  border-radius: 0 0 54% 46%;
-  background-color: #83c6f3;
-  box-shadow: 0 22px 0 #065aa0, 0 50px 0 #043c7c;
-  transform: rotate(-2deg) scaleX(1.05);
+  overflow: visible;
+  background: linear-gradient(135deg, rgba(6,36,84,.98) 0%, rgba(0,73,146,.98) 52%, rgba(0,91,170,.98) 100%);
+  border-top: 1px solid rgba(143,201,244,.45);
 }
 .footer-brand { display: flex; align-items: center; position: relative; z-index: 1; }
 .footer-brand .ieee-logo { height: 42px; }
@@ -245,13 +235,13 @@ button[type="submit"], .button-primary { background: #005baa; color: #fff; borde
 
 @media (max-width: 900px) {
   body { background: #d9eefc; }
-  .shell { width: 100%; min-height: 100vh; margin: 0; border-radius: 0; background: linear-gradient(180deg, #eef9ff 0%, #fff 72%, #062454 72.5%, #004b94 100%); }
+  .shell { width: 100%; min-height: 100vh; margin: 0; border-radius: 0; background: linear-gradient(180deg, #eef9ff 0%, #fff 100%); }
   .site-header { min-height: 74px; padding: 18px 20px; gap: 10px; }
   .brand .ieee-logo { height: 38px; }
   .branch-word { font-size: .92rem; padding-left: 12px; margin-left: 2px; }
   .main-nav { display: none; }
   .mobile-menu { display: block; }
-  main { padding: 0 16px 142px; }
+  main { padding: 0 16px 36px; }
   .home-hero { margin: 16px auto 16px; }
   .home-hero picture { width: 100%; }
   .hero-banner { border-radius: 14px; box-shadow: 0 12px 28px rgba(4,36,84,.12); }
@@ -266,7 +256,7 @@ button[type="submit"], .button-primary { background: #005baa; color: #fff; borde
   .card-arrow { width: 40px; height: 40px; margin: 0; font-size: 1.65rem; grid-column: 3; background: #e9f6ff; color: #005baa; }
   .nav-card.is-featured { min-height: 86px; }
   .nav-card.is-featured .card-arrow { background: #0077c8; color: #fff; }
-  .site-footer { min-height: 132px; padding: 34px 20px 24px; align-items: end; }
+  .site-footer { min-height: 0; padding: 24px 20px; align-items: center; }
   .footer-brand .ieee-logo { height: 34px; }
   .footer-meta { display: none; }
   .footer-location { font-size: .72rem; max-width: 160px; }
