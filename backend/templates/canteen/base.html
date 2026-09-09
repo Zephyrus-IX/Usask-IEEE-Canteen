@@ -1,51 +1,53 @@
+{% load static %}
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Usask IEEE Canteen{% endblock %}</title>
-  <style>
-    :root { color-scheme: light; --border: #ddd; --muted: #666; --bg: #fafafa; }
-    body { font-family: system-ui, sans-serif; margin: 0; line-height: 1.5; color: #111; }
-    header { border-bottom: 1px solid var(--border); padding: 1rem 2rem; background: var(--bg); }
-    main { max-width: 1100px; margin: 0 auto; padding: 2rem; }
-    nav { display: flex; gap: 1rem; flex-wrap: wrap; }
-    nav a, .button { display: inline-block; border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.5rem 0.75rem; text-decoration: none; color: #111; background: white; }
-    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-    th, td { border-bottom: 1px solid var(--border); padding: 0.6rem; text-align: left; }
-    th { background: var(--bg); }
-    .muted { color: var(--muted); }
-    .cards { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-top: 1.5rem; }
-    .card { border: 1px solid var(--border); border-radius: 0.75rem; padding: 1rem; background: var(--bg); }
-    form p { max-width: 520px; display: grid; gap: 0.25rem; }
-    input, textarea, select { font: inherit; padding: 0.45rem; }
-    button { font: inherit; padding: 0.6rem 0.9rem; }
-    .actions { margin: 1rem 0; }
-  </style>
+  <link rel="stylesheet" href="{% static 'canteen/app.css' %}">
 </head>
 <body>
-  <header>
-    <strong><a href="{% url 'home' %}">Usask IEEE Canteen</a></strong>
-    <nav aria-label="Main navigation">
-      <a href="{% url 'new-sale' %}">New Sale</a>
-      <a href="{% url 'load-balance' %}">Load Balance</a>
-      <a href="{% url 'restock-create' %}">Restock</a>
-      <a href="{% url 'reports' %}">Reports</a>
-      <a href="{% url 'student-tab-list' %}">Student Tabs</a>
-      <a href="{% url 'inventory-item-list' %}">Inventory</a>
-      <a href="/admin/">Django Admin</a>
-      {% if user.is_authenticated %}
-        <form method="post" action="{% url 'logout' %}" style="display:inline">
-          {% csrf_token %}
-          <button type="submit">Logout</button>
-        </form>
-      {% else %}
-        <a href="{% url 'login' %}">Login</a>
+  {% include "canteen/_icons.html" %}
+  <div class="shell">
+    <header class="site-header">
+      <a class="brand" href="{% url 'home' %}" aria-label="Usask IEEE Canteen home">
+        <img class="ieee-logo" src="{% static 'canteen/ieee-logo.png' %}" alt="IEEE">
+      </a>
+      <span class="branch-word">CANTEEN</span>
+      <nav class="main-nav" aria-label="Main navigation">
+        <a class="nav-link is-primary" href="{% url 'new-sale' %}"><svg class="nav-icon"><use href="#icon-cart"></use></svg>New Sale</a>
+        <a class="nav-link" href="{% url 'student-tab-list' %}"><svg class="nav-icon"><use href="#icon-user"></use></svg>Student Tabs</a>
+        <a class="nav-link" href="{% url 'inventory-item-list' %}"><svg class="nav-icon"><use href="#icon-cube"></use></svg>Inventory</a>
+        <a class="nav-link" href="{% url 'restock-create' %}"><svg class="nav-icon"><use href="#icon-truck"></use></svg>Restocks</a>
+        <a class="nav-link" href="{% url 'reports' %}"><svg class="nav-icon"><use href="#icon-chart"></use></svg>Reports</a>
+        <a class="nav-link" href="/admin/"><svg class="nav-icon"><use href="#icon-gear"></use></svg>Django Admin</a>
+        {% if user.is_authenticated %}
+          <form method="post" action="{% url 'logout' %}" style="display:inline">
+            {% csrf_token %}
+            <button class="logout-button" type="submit">Logout</button>
+          </form>
+        {% else %}
+          <a class="nav-link" href="{% url 'login' %}"><svg class="nav-icon"><use href="#icon-user"></use></svg>Login</a>
+        {% endif %}
+      </nav>
+      <span class="mobile-menu" aria-hidden="true">☰</span>
+    </header>
+
+    <main>
+      {% if messages %}
+        <ul class="messages">
+          {% for message in messages %}<li>{{ message }}</li>{% endfor %}
+        </ul>
       {% endif %}
-    </nav>
-  </header>
-  <main>
-    {% block content %}{% endblock %}
-  </main>
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+      <div class="footer-brand"><img class="ieee-logo" src="{% static 'canteen/ieee-logo.png' %}" alt="IEEE"></div>
+      <div class="footer-meta"><span>People</span><span>|</span><span>Technology</span><span>|</span><span>A Better Tomorrow</span></div>
+      <div class="footer-location"><svg aria-hidden="true"><use href="#icon-location"></use></svg><span>McNaughton Centre<br>University of Saskatchewan</span></div>
+    </footer>
+  </div>
 </body>
 </html>
