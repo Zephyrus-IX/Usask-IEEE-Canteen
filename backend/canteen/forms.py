@@ -30,6 +30,17 @@ class AccountForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.order_fields([
+            "nsid",
+            "student_id",
+            "first_name",
+            "last_name",
+            "is_active",
+            "is_ieee_member",
+            "ieee_member_id",
+            "ieee_membership_expires_on",
+            "notes",
+        ])
         if self.instance and self.instance.user_id:
             self.fields["nsid"].initial = self.instance.user.username
 

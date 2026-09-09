@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
+from .forms import AccountForm
 from .models import (
     Account,
     BalanceTransaction,
@@ -146,6 +147,15 @@ class ManagementViewTests(TestCase):
         self.assertContains(response, "Alex Student")
         self.assertContains(response, "$20.00")
         self.assertContains(response, "Balance history")
+        self.assertContains(response, "Canteen Pricing")
+        self.assertNotContains(response, "IEEE pricing")
+
+    def test_account_create_form_shows_nsid_before_student_number(self):
+        response = self.client.get(reverse("account-create"))
+
+        content = response.content.decode()
+        self.assertLess(content.index("NSID"), content.index("Student Number"))
+        self.assertEqual(list(AccountForm().fields)[:2], ["nsid", "student_id"])
 
     def test_inventory_list_shows_items_to_customers_without_create_link(self):
         customer = User.objects.create_user(username="abc123", password="12345678")
