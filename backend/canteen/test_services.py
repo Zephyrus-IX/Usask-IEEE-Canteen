@@ -9,7 +9,7 @@ from .models import (
     InventoryItem,
     RestockTaxLine,
     Sale,
-    StudentTab,
+    Account,
     TaxRate,
 )
 from .services import adjust_inventory, create_sale, load_student_balance, record_restock
@@ -17,7 +17,7 @@ from .services import adjust_inventory, create_sale, load_student_balance, recor
 
 class CanteenServiceTests(TestCase):
     def setUp(self):
-        self.tab = StudentTab.objects.create(
+        self.tab = Account.objects.create(
             student_id="12345678",
             first_name="Alex",
             last_name="Student",
@@ -35,18 +35,32 @@ class CanteenServiceTests(TestCase):
         self.tab.is_active = False
         self.tab.save(update_fields=["is_active"])
 
-        with self.assertRaisesMessage(ValidationError, "Student tab is inactive"):
+        with self.assertRaisesMessage(ValidationError, "Account is inactive"):
             create_sale(
-                student_tab=self.tab,
+                account=self.tab,
                 items=[{"inventory_item": self.coke, "quantity": 1}],
+                payment_method=Sale.PaymentMethod.BALANCE,
+            )
+
+    def test_create_sale_requires_balance_payment_method(self):
+        with self.assertRaisesMessage(ValidationError, "Sales must use student balance"):
+            create_sale(
+                account=self.tab,
+                items=[{"inventory_item": self.coke, "quantity": 2}],
                 payment_method=Sale.PaymentMethod.CASH,
             )
 
-    def test_create_cash_sale_reduces_inventory_and_marks_paid(self):
+    def test_create_balance_sale_reduces_inventory_and_marks_paid(self):
+        load_student_balance(
+            account=self.tab,
+            amount=Decimal("10.00"),
+            payment_method=BalanceTransaction.PaymentMethod.CASH,
+        )
+
         sale = create_sale(
-            student_tab=self.tab,
+            account=self.tab,
             items=[{"inventory_item": self.coke, "quantity": 2}],
-            payment_method=Sale.PaymentMethod.CASH,
+            payment_method=Sale.PaymentMethod.BALANCE,
         )
 
         self.coke.refresh_from_db()
@@ -57,20 +71,20 @@ class CanteenServiceTests(TestCase):
     def test_create_balance_sale_requires_sufficient_balance(self):
         with self.assertRaisesMessage(ValidationError, "Insufficient student balance"):
             create_sale(
-                student_tab=self.tab,
+                account=self.tab,
                 items=[{"inventory_item": self.coke, "quantity": 1}],
                 payment_method=Sale.PaymentMethod.BALANCE,
             )
 
     def test_create_balance_sale_deducts_student_balance(self):
         load_student_balance(
-            student_tab=self.tab,
+            account=self.tab,
             amount=Decimal("10.00"),
             payment_method=BalanceTransaction.PaymentMethod.CASH,
         )
 
         sale = create_sale(
-            student_tab=self.tab,
+            account=self.tab,
             items=[{"inventory_item": self.coke, "quantity": 2}],
             payment_method=Sale.PaymentMethod.BALANCE,
         )
@@ -81,15 +95,15 @@ class CanteenServiceTests(TestCase):
     def test_create_sale_blocks_insufficient_inventory(self):
         with self.assertRaisesMessage(ValidationError, "Insufficient inventory"):
             create_sale(
-                student_tab=self.tab,
+                account=self.tab,
                 items=[{"inventory_item": self.coke, "quantity": 99}],
-                payment_method=Sale.PaymentMethod.CASH,
+                payment_method=Sale.PaymentMethod.BALANCE,
             )
 
     def test_load_student_balance_requires_positive_amount(self):
         with self.assertRaisesMessage(ValidationError, "Balance load amount must be positive"):
             load_student_balance(
-                student_tab=self.tab,
+                account=self.tab,
                 amount=Decimal("0.00"),
                 payment_method=BalanceTransaction.PaymentMethod.CASH,
             )

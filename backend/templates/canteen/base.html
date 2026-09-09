@@ -17,11 +17,17 @@
       <span class="branch-word">CANTEEN</span>
       <nav class="main-nav" aria-label="Main navigation">
         <a class="nav-link is-primary" href="{% url 'new-sale' %}"><svg class="nav-icon"><use href="#icon-cart"></use></svg>New Sale</a>
-        <a class="nav-link" href="{% url 'student-tab-list' %}"><svg class="nav-icon"><use href="#icon-user"></use></svg>Student Tabs</a>
-        <a class="nav-link" href="{% url 'inventory-item-list' %}"><svg class="nav-icon"><use href="#icon-cube"></use></svg>Inventory</a>
-        <a class="nav-link" href="{% url 'restock-create' %}"><svg class="nav-icon"><use href="#icon-truck"></use></svg>Restocks</a>
-        <a class="nav-link" href="{% url 'reports' %}"><svg class="nav-icon"><use href="#icon-chart"></use></svg>Reports</a>
-        <a class="nav-link" href="/admin/"><svg class="nav-icon"><use href="#icon-gear"></use></svg>Django Admin</a>
+        {% if user.is_authenticated and user.is_staff %}
+          <a class="nav-link" href="{% url 'account-list' %}"><svg class="nav-icon"><use href="#icon-user"></use></svg>Accounts</a>
+          <a class="nav-link" href="{% url 'inventory-item-list' %}"><svg class="nav-icon"><use href="#icon-cube"></use></svg>Inventory</a>
+          <a class="nav-link" href="{% url 'load-balance' %}"><svg class="nav-icon"><use href="#icon-wallet"></use></svg>Load Balance</a>
+          <a class="nav-link" href="{% url 'restock-create' %}"><svg class="nav-icon"><use href="#icon-truck"></use></svg>Restocks</a>
+          <a class="nav-link" href="{% url 'reports' %}"><svg class="nav-icon"><use href="#icon-chart"></use></svg>Reports</a>
+          <a class="nav-link" href="/admin/"><svg class="nav-icon"><use href="#icon-gear"></use></svg>Django Admin</a>
+        {% else %}
+          <a class="nav-link" href="{% url 'account-detail' %}"><svg class="nav-icon"><use href="#icon-wallet"></use></svg>Check Balance</a>
+          <a class="nav-link" href="{% url 'inventory-item-list' %}"><svg class="nav-icon"><use href="#icon-cube"></use></svg>Items for Sale</a>
+        {% endif %}
         {% if user.is_authenticated %}
           <form method="post" action="{% url 'logout' %}" style="display:inline">
             {% csrf_token %}

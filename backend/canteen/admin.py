@@ -9,15 +9,16 @@ from .models import (
     RestockTaxLine,
     Sale,
     SaleItem,
-    StudentTab,
+    Account,
     TaxRate,
 )
 
 
-@admin.register(StudentTab)
-class StudentTabAdmin(admin.ModelAdmin):
+@admin.register(Account)
+class AccountAdmin(admin.ModelAdmin):
     list_display = (
         "student_id",
+        "user",
         "first_name",
         "last_name",
         "is_active",
@@ -26,7 +27,7 @@ class StudentTabAdmin(admin.ModelAdmin):
         "has_active_ieee_discount",
         "current_balance",
     )
-    search_fields = ("student_id", "first_name", "last_name", "ieee_member_id")
+    search_fields = ("student_id", "user__username", "first_name", "last_name", "ieee_member_id")
     list_filter = ("is_active", "is_ieee_member")
 
 
@@ -58,17 +59,17 @@ class SaleItemInline(admin.TabularInline):
 
 @admin.register(Sale)
 class SaleAdmin(admin.ModelAdmin):
-    list_display = ("id", "student_tab", "payment_method", "status", "total_amount", "created_at")
+    list_display = ("id", "account", "payment_method", "status", "total_amount", "created_at")
     list_filter = ("payment_method", "status", "created_at")
-    search_fields = ("student_tab__student_id", "student_tab__first_name", "student_tab__last_name")
+    search_fields = ("account__student_id", "account__first_name", "account__last_name")
     inlines = [SaleItemInline]
 
 
 @admin.register(BalanceTransaction)
 class BalanceTransactionAdmin(admin.ModelAdmin):
-    list_display = ("student_tab", "transaction_type", "payment_method", "amount", "created_at")
+    list_display = ("account", "transaction_type", "payment_method", "amount", "created_at")
     list_filter = ("transaction_type", "payment_method", "created_at")
-    search_fields = ("student_tab__student_id", "student_tab__first_name", "student_tab__last_name")
+    search_fields = ("account__student_id", "account__first_name", "account__last_name")
 
 
 class RestockItemInline(admin.TabularInline):

@@ -1,0 +1,16 @@
+{% extends "canteen/base.html" %}
+
+{% block title %}Create Account · Usask IEEE Canteen{% endblock %}
+
+{% block content %}
+  <section class="page-panel">
+    <h1>Create Account</h1>
+    <p class="muted">The student's NSID becomes their username. Their Student Number is set as the initial password.</p>
+    <form method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button type="submit">Save account</button>
+      <a class="button" href="{% url 'account-list' %}">Cancel</a>
+    </form>
+  </section>
+{% endblock %}

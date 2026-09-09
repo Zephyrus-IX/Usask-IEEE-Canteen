@@ -13,7 +13,14 @@ def quantize_money(value: Decimal) -> Decimal:
     return Decimal(value).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
 
 
-class StudentTab(models.Model):
+class Account(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="canteen_account",
+        blank=True,
+        null=True,
+    )
     student_id = models.CharField(max_length=32, unique=True)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
@@ -25,7 +32,7 @@ class StudentTab(models.Model):
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
-        related_name="created_student_tabs",
+        related_name="created_accounts",
         blank=True,
         null=True,
     )
@@ -67,8 +74,8 @@ class InventoryItem(models.Model):
     def __str__(self) -> str:
         return self.name
 
-    def price_for_tab(self, tab: StudentTab) -> Decimal:
-        return self.member_price if tab.has_active_ieee_discount else self.non_member_price
+    def price_for_account(self, account: Account) -> Decimal:
+        return self.member_price if account.has_active_ieee_discount else self.non_member_price
 
 
 class TaxRate(models.Model):
@@ -96,7 +103,7 @@ class Sale(models.Model):
         PAID = "paid", "Paid"
         VOID = "void", "Void"
 
-    student_tab = models.ForeignKey(StudentTab, on_delete=models.PROTECT, related_name="sales")
+    account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name="sales")
     handled_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -113,7 +120,7 @@ class Sale(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
-        return f"Sale #{self.pk or 'new'} - {self.student_tab}"
+        return f"Sale #{self.pk or 'new'} - {self.account}"
 
     def recalculate_total(self, *, save: bool = True) -> Decimal:
         total = self.items.aggregate(total=Sum("line_total"))["total"] or Decimal("0.00")
@@ -125,7 +132,7 @@ class Sale(models.Model):
 
 class SaleItemManager(models.Manager):
     def create_for_sale(self, *, sale: Sale, inventory_item: InventoryItem, quantity: int):
-        unit_price = inventory_item.price_for_tab(sale.student_tab)
+        unit_price = inventory_item.price_for_account(sale.account)
         return self.create(
             sale=sale,
             inventory_item=inventory_item,
@@ -168,8 +175,8 @@ class BalanceTransaction(models.Model):
         BALANCE = "balance", "Student Balance"
         INTERNAL = "internal", "Internal"
 
-    student_tab = models.ForeignKey(
-        StudentTab,
+    account = models.ForeignKey(
+        Account,
         on_delete=models.PROTECT,
         related_name="balance_transactions",
     )
@@ -197,7 +204,7 @@ class BalanceTransaction(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
-        return f"{self.student_tab}: {self.amount}"
+        return f"{self.account}: {self.amount}"
 
 
 class RestockEvent(models.Model):

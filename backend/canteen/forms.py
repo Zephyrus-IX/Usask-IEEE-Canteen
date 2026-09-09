@@ -1,14 +1,17 @@
 from django import forms
+from django.contrib.auth.models import User
 
-from .models import BalanceTransaction, InventoryItem, Sale, StudentTab, TaxRate
+from .models import Account, BalanceTransaction, InventoryItem, TaxRate
 
 SALE_ITEM_ROW_COUNT = 5
 RESTOCK_ITEM_ROW_COUNT = 5
 
 
-class StudentTabForm(forms.ModelForm):
+class AccountForm(forms.ModelForm):
+    nsid = forms.CharField(label="NSID", max_length=150)
+
     class Meta:
-        model = StudentTab
+        model = Account
         fields = [
             "student_id",
             "first_name",
@@ -19,10 +22,58 @@ class StudentTabForm(forms.ModelForm):
             "ieee_membership_expires_on",
             "notes",
         ]
+        labels = {"student_id": "Student Number"}
         widgets = {
             "ieee_membership_expires_on": forms.DateInput(attrs={"type": "date"}),
             "notes": forms.Textarea(attrs={"rows": 3}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.order_fields([
+            "nsid",
+            "student_id",
+            "first_name",
+            "last_name",
+            "is_active",
+            "is_ieee_member",
+            "ieee_member_id",
+            "ieee_membership_expires_on",
+            "notes",
+        ])
+        if self.instance and self.instance.user_id:
+            self.fields["nsid"].initial = self.instance.user.username
+
+    def clean_nsid(self):
+        nsid = self.cleaned_data["nsid"].strip().lower()
+        user_qs = User.objects.filter(username__iexact=nsid)
+        if self.instance and self.instance.user_id:
+            user_qs = user_qs.exclude(pk=self.instance.user_id)
+        if user_qs.exists():
+            raise forms.ValidationError("An account already uses this NSID.")
+        return nsid
+
+    def save(self, commit=True):
+        account = super().save(commit=False)
+        nsid = self.cleaned_data["nsid"]
+        student_number = self.cleaned_data["student_id"]
+        if account.user_id:
+            user = account.user
+            user.username = nsid
+            user.set_password(student_number)
+        else:
+            user = User(username=nsid, first_name=account.first_name, last_name=account.last_name)
+            user.set_password(student_number)
+        user.first_name = account.first_name
+        user.last_name = account.last_name
+        if commit:
+            user.save()
+            account.user = user
+            account.save()
+            self.save_m2m()
+        else:
+            account.user = user
+        return account
 
 
 class InventoryItemForm(forms.ModelForm):
@@ -43,9 +94,9 @@ class InventoryItemForm(forms.ModelForm):
 
 
 class LoadBalanceForm(forms.Form):
-    student_tab = forms.ModelChoiceField(
-        queryset=StudentTab.objects.none(),
-        label="Student tab",
+    account = forms.ModelChoiceField(
+        queryset=Account.objects.none(),
+        label="Account",
     )
     amount = forms.DecimalField(min_value=0.01, max_digits=10, decimal_places=2)
     payment_method = forms.ChoiceField(
@@ -58,26 +109,25 @@ class LoadBalanceForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["student_tab"].queryset = StudentTab.objects.filter(is_active=True).order_by(
-            "student_id"
-        )
+        self.fields["account"].queryset = Account.objects.filter(is_active=True).order_by("student_id")
 
 
 class NewSaleForm(forms.Form):
-    student_tab = forms.ModelChoiceField(
-        queryset=StudentTab.objects.none(),
-        label="Student tab",
+    account = forms.ModelChoiceField(
+        queryset=Account.objects.none(),
+        label="Account",
+        required=False,
     )
-    payment_method = forms.ChoiceField(choices=Sale.PaymentMethod.choices)
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, staff_user=False, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["student_tab"].queryset = StudentTab.objects.filter(is_active=True).order_by(
-            "student_id"
-        )
-        item_queryset = InventoryItem.objects.filter(is_active=True, quantity_on_hand__gt=0).order_by(
-            "name"
-        )
+        self.staff_user = staff_user
+        if staff_user:
+            self.fields["account"].required = True
+            self.fields["account"].queryset = Account.objects.filter(is_active=True).order_by("student_id")
+        else:
+            self.fields.pop("account")
+        item_queryset = InventoryItem.objects.filter(is_active=True, quantity_on_hand__gt=0).order_by("name")
         for row_number in range(1, SALE_ITEM_ROW_COUNT + 1):
             self.fields[f"item_{row_number}"] = forms.ModelChoiceField(
                 queryset=item_queryset,
@@ -174,9 +224,7 @@ class RestockForm(forms.Form):
                 if not quantity:
                     self.add_error(f"quantity_{row_number}", "Enter a quantity for this row.")
                 if not line_subtotal:
-                    self.add_error(
-                        f"line_subtotal_{row_number}", "Enter the pre-tax subtotal for this row."
-                    )
+                    self.add_error(f"line_subtotal_{row_number}", "Enter the pre-tax subtotal for this row.")
             elif row_has_all_data:
                 items.append(
                     {

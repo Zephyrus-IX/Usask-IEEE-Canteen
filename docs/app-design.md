@@ -2,8 +2,8 @@
 
 ## Core rule summary
 
-1. Every sale must be attached to an active student tab.
-2. Student tabs are created by an admin/IEEE exec.
+1. Every sale must be attached to an active account.
+2. Accounts are created by an admin/IEEE exec.
 3. IEEE membership discount applies only when membership is marked active and expiry date has not passed.
 4. Sales decrease inventory automatically.
 5. Restocks increase inventory automatically.
@@ -15,7 +15,7 @@
 
 ```text
 New Sale
-Student Tabs
+Accounts
 Inventory
 Restocks
 Reports
@@ -24,9 +24,10 @@ Settings
 
 ## Data model draft
 
-### StudentTab
+### Account
 
 - student_id
+- user
 - first_name
 - last_name
 - is_active
@@ -52,7 +53,7 @@ Settings
 
 ### Sale
 
-- student_tab
+- account
 - handled_by
 - payment_method
 - total_amount
@@ -69,7 +70,7 @@ Settings
 
 ### BalanceTransaction
 
-- student_tab
+- account
 - transaction_type: load, purchase, refund, adjustment
 - payment_method: cash, card, balance, internal
 - amount

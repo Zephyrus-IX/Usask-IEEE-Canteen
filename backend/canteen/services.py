@@ -13,7 +13,7 @@ from .models import (
     RestockTaxLine,
     Sale,
     SaleItem,
-    StudentTab,
+    Account,
     TaxRate,
     quantize_money,
 )
@@ -28,20 +28,20 @@ def _positive_decimal(value: Decimal, message: str) -> Decimal:
 
 def load_student_balance(
     *,
-    student_tab: StudentTab,
+    account: Account,
     amount: Decimal,
     payment_method: str,
     handled_by=None,
     note: str = "",
 ) -> BalanceTransaction:
-    if not student_tab.is_active:
-        raise ValidationError("Student tab is inactive")
+    if not account.is_active:
+        raise ValidationError("Account is inactive")
     amount = _positive_decimal(amount, "Balance load amount must be positive")
     if payment_method not in {BalanceTransaction.PaymentMethod.CASH, BalanceTransaction.PaymentMethod.CARD}:
         raise ValidationError("Balance loads must be paid by cash or card")
 
     return BalanceTransaction.objects.create(
-        student_tab=student_tab,
+        account=account,
         transaction_type=BalanceTransaction.TransactionType.LOAD,
         payment_method=payment_method,
         amount=amount,
@@ -53,15 +53,15 @@ def load_student_balance(
 @transaction.atomic
 def create_sale(
     *,
-    student_tab: StudentTab,
+    account: Account,
     items: list[dict],
     payment_method: str,
     handled_by=None,
 ) -> Sale:
-    if not student_tab.is_active:
-        raise ValidationError("Student tab is inactive")
-    if payment_method not in Sale.PaymentMethod.values:
-        raise ValidationError("Invalid payment method")
+    if not account.is_active:
+        raise ValidationError("Account is inactive")
+    if payment_method != Sale.PaymentMethod.BALANCE:
+        raise ValidationError("Sales must use student balance")
     if not items:
         raise ValidationError("Sale must contain at least one item")
 
@@ -78,7 +78,7 @@ def create_sale(
         locked_items.append((inventory_item, quantity))
 
     sale = Sale.objects.create(
-        student_tab=student_tab,
+        account=account,
         handled_by=handled_by,
         payment_method=payment_method,
         status=Sale.Status.DRAFT,
@@ -93,18 +93,17 @@ def create_sale(
 
     sale.recalculate_total()
 
-    if payment_method == Sale.PaymentMethod.BALANCE:
-        current_balance = StudentTab.objects.get(pk=student_tab.pk).current_balance
-        if current_balance < sale.total_amount:
-            raise ValidationError("Insufficient student balance")
-        BalanceTransaction.objects.create(
-            student_tab=student_tab,
-            transaction_type=BalanceTransaction.TransactionType.PURCHASE,
-            payment_method=BalanceTransaction.PaymentMethod.BALANCE,
-            amount=-sale.total_amount,
-            related_sale=sale,
-            handled_by=handled_by,
-        )
+    current_balance = Account.objects.get(pk=account.pk).current_balance
+    if current_balance < sale.total_amount:
+        raise ValidationError("Insufficient student balance")
+    BalanceTransaction.objects.create(
+        account=account,
+        transaction_type=BalanceTransaction.TransactionType.PURCHASE,
+        payment_method=BalanceTransaction.PaymentMethod.BALANCE,
+        amount=-sale.total_amount,
+        related_sale=sale,
+        handled_by=handled_by,
+    )
 
     for inventory_item, quantity in locked_items:
         InventoryItem.objects.filter(pk=inventory_item.pk).update(

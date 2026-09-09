@@ -1,36 +1,38 @@
 {% extends "canteen/base.html" %}
 
-{% block title %}Inventory · Usask IEEE Canteen{% endblock %}
+{% block title %}Items for Sale · Usask IEEE Canteen{% endblock %}
 
 {% block content %}
-  <h1>Inventory</h1>
-  <p class="muted">Each stocked product is tracked as its own inventory entry.</p>
-  <p class="actions"><a class="button" href="{% url 'inventory-item-create' %}">Create inventory item</a></p>
+  <section class="page-panel">
+    <h1>{% if user.is_staff %}Inventory{% else %}Items for Sale{% endif %}</h1>
+    <p class="muted">Current canteen stock and prices.</p>
+    {% if user.is_staff %}
+      <p class="actions"><a class="button" href="{% url 'inventory-item-create' %}">Create inventory item</a></p>
+    {% endif %}
 
-  <table>
-    <thead>
-      <tr>
-        <th>Item</th>
-        <th>Quantity</th>
-        <th>Member price</th>
-        <th>Non-member price</th>
-        <th>Low stock threshold</th>
-        <th>Status</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for item in inventory_items %}
+    <table>
+      <thead>
         <tr>
-          <td>{{ item.name }}</td>
-          <td>{{ item.quantity_on_hand }}</td>
-          <td>${{ item.member_price }}</td>
-          <td>${{ item.non_member_price }}</td>
-          <td>{{ item.low_stock_threshold }}</td>
-          <td>{% if item.is_active %}Active{% else %}Inactive{% endif %}</td>
+          <th>Item</th>
+          <th>Quantity</th>
+          <th>Member price</th>
+          <th>Non-member price</th>
+          {% if user.is_staff %}<th>Low stock threshold</th><th>Status</th>{% endif %}
         </tr>
-      {% empty %}
-        <tr><td colspan="6">No inventory items yet.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        {% for item in inventory_items %}
+          <tr>
+            <td>{{ item.name }}</td>
+            <td>{{ item.quantity_on_hand }}</td>
+            <td>${{ item.member_price }}</td>
+            <td>${{ item.non_member_price }}</td>
+            {% if user.is_staff %}<td>{{ item.low_stock_threshold }}</td><td>{% if item.is_active %}Active{% else %}Inactive{% endif %}</td>{% endif %}
+          </tr>
+        {% empty %}
+          <tr><td colspan="{% if user.is_staff %}6{% else %}4{% endif %}">No inventory items yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
 {% endblock %}

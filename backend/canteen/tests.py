@@ -12,13 +12,13 @@ from .models import (
     RestockTaxLine,
     Sale,
     SaleItem,
-    StudentTab,
+    Account,
 )
 
 
 class CanteenModelTests(TestCase):
     def test_sale_item_uses_member_price_and_calculates_line_total(self):
-        tab = StudentTab.objects.create(
+        tab = Account.objects.create(
             student_id="12345678",
             first_name="Alex",
             last_name="Student",
@@ -31,7 +31,7 @@ class CanteenModelTests(TestCase):
             member_price=Decimal("1.25"),
             non_member_price=Decimal("1.50"),
         )
-        sale = Sale.objects.create(student_tab=tab, payment_method=Sale.PaymentMethod.CASH)
+        sale = Sale.objects.create(account=tab, payment_method=Sale.PaymentMethod.CASH)
 
         sale_item = SaleItem.objects.create_for_sale(sale=sale, inventory_item=item, quantity=2)
 
@@ -39,16 +39,16 @@ class CanteenModelTests(TestCase):
         self.assertEqual(sale_item.line_total, Decimal("2.50"))
 
     def test_student_balance_is_sum_of_balance_transactions(self):
-        tab = StudentTab.objects.create(student_id="12345678", first_name="Alex", last_name="Student")
+        tab = Account.objects.create(student_id="12345678", first_name="Alex", last_name="Student")
 
         BalanceTransaction.objects.create(
-            student_tab=tab,
+            account=tab,
             transaction_type=BalanceTransaction.TransactionType.LOAD,
             payment_method=BalanceTransaction.PaymentMethod.CASH,
             amount=Decimal("20.00"),
         )
         BalanceTransaction.objects.create(
-            student_tab=tab,
+            account=tab,
             transaction_type=BalanceTransaction.TransactionType.PURCHASE,
             payment_method=BalanceTransaction.PaymentMethod.BALANCE,
             amount=Decimal("-3.50"),
