@@ -244,6 +244,50 @@ class ManagementViewTests(TestCase):
         self.assertNotContains(response, "Account:")
         self.assertNotContains(response, "Payment method")
 
+    def test_customer_new_sale_warns_when_balance_below_cheapest_item(self):
+        customer = User.objects.create_user(username="abc123", password="12345678")
+        account = Account.objects.create(user=customer, student_id="12345678", first_name="Alex", last_name="Student")
+        BalanceTransaction.objects.create(
+            account=account,
+            transaction_type=BalanceTransaction.TransactionType.LOAD,
+            payment_method=BalanceTransaction.PaymentMethod.CASH,
+            amount=Decimal("1.00"),
+        )
+        InventoryItem.objects.create(
+            name="Coke",
+            quantity_on_hand=10,
+            member_price=Decimal("1.25"),
+            non_member_price=Decimal("1.50"),
+        )
+        self.client.force_login(customer)
+
+        response = self.client.get(reverse("new-sale"))
+
+        self.assertContains(response, "balance is too low")
+        self.assertContains(response, "Reach out to an IEEE executive")
+        self.assertContains(response, "balance-warning")
+
+    def test_customer_new_sale_does_not_warn_when_balance_can_buy_cheapest_item(self):
+        customer = User.objects.create_user(username="abc123", password="12345678")
+        account = Account.objects.create(user=customer, student_id="12345678", first_name="Alex", last_name="Student")
+        BalanceTransaction.objects.create(
+            account=account,
+            transaction_type=BalanceTransaction.TransactionType.LOAD,
+            payment_method=BalanceTransaction.PaymentMethod.CASH,
+            amount=Decimal("1.50"),
+        )
+        InventoryItem.objects.create(
+            name="Coke",
+            quantity_on_hand=10,
+            member_price=Decimal("1.25"),
+            non_member_price=Decimal("1.50"),
+        )
+        self.client.force_login(customer)
+
+        response = self.client.get(reverse("new-sale"))
+
+        self.assertNotContains(response, "balance is too low")
+
     def test_customer_balance_sale_from_web_form_uses_own_account(self):
         customer = User.objects.create_user(username="abc123", password="12345678")
         account = Account.objects.create(

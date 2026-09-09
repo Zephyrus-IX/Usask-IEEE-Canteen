@@ -11,6 +11,12 @@
       <div class="card">
         <strong>{{ account.first_name }} {{ account.last_name }}</strong><br>
         <span class="muted">Current balance: ${{ account.current_balance|floatformat:2 }}</span>
+        {% if balance_warning %}
+          <p class="balance-warning">
+            Your balance is too low to buy the cheapest available item (${{ cheapest_item_price|floatformat:2 }}).
+            Reach out to an IEEE executive to load more money onto your account.
+          </p>
+        {% endif %}
       </div>
     {% elif is_staff_user %}
       <p class="muted">Select the account you are facilitating a sale for.</p>

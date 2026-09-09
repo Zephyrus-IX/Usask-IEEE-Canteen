@@ -35,6 +35,31 @@ def get_user_account(user):
         return None
 
 
+def cheapest_available_item_price_for(account):
+    prices = [
+        item.price_for_account(account)
+        for item in InventoryItem.objects.filter(is_active=True, quantity_on_hand__gt=0)
+    ]
+    return min(prices) if prices else None
+
+
+def new_sale_context(form, request, account):
+    cheapest_item_price = cheapest_available_item_price_for(account) if account else None
+    balance_warning = bool(
+        account
+        and cheapest_item_price is not None
+        and account.current_balance < cheapest_item_price
+    )
+    return {
+        "form": form,
+        "account": account,
+        "uses_balance_only": True,
+        "is_staff_user": is_staff_user(request.user),
+        "cheapest_item_price": cheapest_item_price,
+        "balance_warning": balance_warning,
+    }
+
+
 def home(request):
     return render(request, "canteen/home.html", {"is_staff_user": is_staff_user(request.user)})
 
@@ -63,11 +88,7 @@ class NewSaleView(LoginRequiredMixin, View):
     def get(self, request):
         account = None if is_staff_user(request.user) else get_user_account(request.user)
         form = NewSaleForm(staff_user=is_staff_user(request.user))
-        return render(
-            request,
-            self.template_name,
-            {"form": form, "account": account, "uses_balance_only": True, "is_staff_user": is_staff_user(request.user)},
-        )
+        return render(request, self.template_name, new_sale_context(form, request, account))
 
     def post(self, request):
         form = NewSaleForm(request.POST, staff_user=is_staff_user(request.user))
@@ -90,11 +111,7 @@ class NewSaleView(LoginRequiredMixin, View):
                 return redirect("new-sale")
         if not is_staff_user(request.user):
             account = get_user_account(request.user)
-        return render(
-            request,
-            self.template_name,
-            {"form": form, "account": account, "uses_balance_only": True, "is_staff_user": is_staff_user(request.user)},
-        )
+        return render(request, self.template_name, new_sale_context(form, request, account))
 
 
 class AccountDetailView(LoginRequiredMixin, DetailView):
