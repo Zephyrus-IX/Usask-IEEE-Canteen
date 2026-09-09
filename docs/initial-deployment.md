@@ -87,7 +87,7 @@ Use the superuser account created in the previous step.
 
 The canteen models currently registered in Django admin include:
 
-- Student tabs
+- Student accounts
 - Inventory items
 - Tax rates
 - Sales
@@ -101,7 +101,7 @@ After the first admin login:
 
 1. Add any tax rates needed for restock tracking.
 2. Add inventory items with member and non-member prices.
-3. Add active student tabs.
+3. Add active student accounts.
 4. Enter initial stock through restocks or inventory adjustments.
 5. Test one small sale with an exec/admin account.
 

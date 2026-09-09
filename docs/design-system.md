@@ -51,4 +51,4 @@ Source reference: AI-generated mockup provided 2026-09-08.
    - `backend/canteen/static/canteen/home-hero-wide.png` for landscape/wide viewports.
    - `backend/canteen/static/canteen/home-hero-mobile.png` for portrait/narrow-aspect viewports via `<picture>` and `(max-aspect-ratio: 4/3)`.
    - `backend/canteen/static/canteen/mcnaughton-centre.png` is retained only as an older alternate asset.
-3. Confirm whether `Load Balance` stays as its own dashboard card or is nested under `Student Tabs` later.
+3. Confirm whether `Load Balance` stays as its own dashboard card or is nested under `Accounts` later.

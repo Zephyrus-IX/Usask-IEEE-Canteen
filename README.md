@@ -1,18 +1,18 @@
 # Usask IEEE Canteen
 
-A self-hosted Docker app to manage and track inventory, in-person sales, student tabs, prepaid balances, restocks, and expenses for the Usask IEEE student branch canteen.
+A self-hosted Docker app to manage and track inventory, in-person sales, student accounts, prepaid balances, restocks, and expenses for the Usask IEEE student branch canteen.
 
 ## Project goals
 
-- Exec-facilitated in-person sales only
-- Every sale must be attached to an active student tab
-- Student tabs are created by an admin/IEEE exec
-- Optional prepaid student balances
+- Public customer self-service plus exec-facilitated in-person sales
+- Every sale must be attached to an active student account
+- Student accounts are created by an admin/IEEE exec
+- Sales use prepaid student account balances only
 - IEEE member and non-member pricing
 - Inventory automatically decreases on completed sales
 - Restocks are manually entered and increase inventory
 - Restock GST/PST/LST tracking with configurable tax rates
-- CSV exports for sales, balances, restocks, inventory, and student tabs
+- CSV exports for sales, balances, restocks, inventory, and student accounts
 - Web UI first, CLI/TUI fallback later
 
 ## Planned stack

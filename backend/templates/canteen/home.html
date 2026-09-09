@@ -17,63 +17,85 @@
       <div class="nav-card-copy">
         <svg class="nav-card-icon" aria-hidden="true"><use href="#icon-cart"></use></svg>
         <h2>New Sale</h2>
-        <p>Start a new purchase</p>
+        <p>Purchase from your prepaid balance</p>
       </div>
       <span class="card-arrow" aria-hidden="true">›</span>
     </a>
 
-    <a class="nav-card" href="{% url 'student-tab-list' %}">
-      <div class="nav-card-copy">
-        <svg class="nav-card-icon" aria-hidden="true"><use href="#icon-user"></use></svg>
-        <h2>Student Tabs</h2>
-        <p>Manage student accounts</p>
-      </div>
-      <span class="card-arrow" aria-hidden="true">›</span>
-    </a>
+    {% if user.is_authenticated and user.is_staff %}
+      <a class="nav-card" href="{% url 'account-list' %}">
+        <div class="nav-card-copy">
+          <svg class="nav-card-icon" aria-hidden="true"><use href="#icon-user"></use></svg>
+          <h2>Accounts</h2>
+          <p>Manage student accounts</p>
+        </div>
+        <span class="card-arrow" aria-hidden="true">›</span>
+      </a>
+    {% else %}
+      <a class="nav-card" href="{% url 'account-detail' %}">
+        <div class="nav-card-copy">
+          <svg class="nav-card-icon" aria-hidden="true"><use href="#icon-wallet"></use></svg>
+          <h2>Check Balance</h2>
+          <p>View your balance and account history</p>
+        </div>
+        <span class="card-arrow" aria-hidden="true">›</span>
+      </a>
+    {% endif %}
 
     <a class="nav-card" href="{% url 'inventory-item-list' %}">
       <div class="nav-card-copy">
         <svg class="nav-card-icon" aria-hidden="true"><use href="#icon-cube"></use></svg>
-        <h2>Inventory</h2>
-        <p>View and manage stock</p>
+        <h2>{% if user.is_authenticated and user.is_staff %}Inventory{% else %}Items for Sale{% endif %}</h2>
+        <p>View current stock and prices</p>
       </div>
       <span class="card-arrow" aria-hidden="true">›</span>
     </a>
 
-    <a class="nav-card" href="{% url 'load-balance' %}">
-      <div class="nav-card-copy">
-        <svg class="nav-card-icon" aria-hidden="true"><use href="#icon-wallet"></use></svg>
-        <h2>Load Balance</h2>
-        <p>Add prepaid tab funds</p>
-      </div>
-      <span class="card-arrow" aria-hidden="true">›</span>
-    </a>
+    {% if user.is_authenticated and user.is_staff %}
+      <a class="nav-card" href="{% url 'load-balance' %}">
+        <div class="nav-card-copy">
+          <svg class="nav-card-icon" aria-hidden="true"><use href="#icon-wallet"></use></svg>
+          <h2>Load Balance</h2>
+          <p>Add prepaid account funds</p>
+        </div>
+        <span class="card-arrow" aria-hidden="true">›</span>
+      </a>
 
-    <a class="nav-card" href="{% url 'restock-create' %}">
-      <div class="nav-card-copy">
-        <svg class="nav-card-icon" aria-hidden="true"><use href="#icon-truck"></use></svg>
-        <h2>Restocks</h2>
-        <p>Log and track restocks</p>
-      </div>
-      <span class="card-arrow" aria-hidden="true">›</span>
-    </a>
+      <a class="nav-card" href="{% url 'restock-create' %}">
+        <div class="nav-card-copy">
+          <svg class="nav-card-icon" aria-hidden="true"><use href="#icon-truck"></use></svg>
+          <h2>Restocks</h2>
+          <p>Log and track restocks</p>
+        </div>
+        <span class="card-arrow" aria-hidden="true">›</span>
+      </a>
 
-    <a class="nav-card" href="{% url 'reports' %}">
-      <div class="nav-card-copy">
-        <svg class="nav-card-icon" aria-hidden="true"><use href="#icon-chart"></use></svg>
-        <h2>Reports</h2>
-        <p>View sales and canteen data</p>
-      </div>
-      <span class="card-arrow" aria-hidden="true">›</span>
-    </a>
+      <a class="nav-card" href="{% url 'reports' %}">
+        <div class="nav-card-copy">
+          <svg class="nav-card-icon" aria-hidden="true"><use href="#icon-chart"></use></svg>
+          <h2>Reports</h2>
+          <p>View sales and canteen data</p>
+        </div>
+        <span class="card-arrow" aria-hidden="true">›</span>
+      </a>
 
-    <a class="nav-card" href="/admin/">
-      <div class="nav-card-copy">
-        <svg class="nav-card-icon" aria-hidden="true"><use href="#icon-gear"></use></svg>
-        <h2>Settings / Admin</h2>
-        <p>System configuration</p>
-      </div>
-      <span class="card-arrow" aria-hidden="true">›</span>
-    </a>
+      <a class="nav-card" href="/admin/">
+        <div class="nav-card-copy">
+          <svg class="nav-card-icon" aria-hidden="true"><use href="#icon-gear"></use></svg>
+          <h2>Settings / Admin</h2>
+          <p>System configuration</p>
+        </div>
+        <span class="card-arrow" aria-hidden="true">›</span>
+      </a>
+    {% elif not user.is_authenticated %}
+      <a class="nav-card" href="{% url 'login' %}">
+        <div class="nav-card-copy">
+          <svg class="nav-card-icon" aria-hidden="true"><use href="#icon-user"></use></svg>
+          <h2>Login</h2>
+          <p>Use your NSID and student number</p>
+        </div>
+        <span class="card-arrow" aria-hidden="true">›</span>
+      </a>
+    {% endif %}
   </section>
 {% endblock %}

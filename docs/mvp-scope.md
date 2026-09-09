@@ -2,11 +2,11 @@
 
 ## Included in prototype v1
 
-### Student tabs
+### Accounts
 
 - Student ID is required
 - First and last name are required
-- Tab status: active/inactive
+- Account status: active/inactive
 - IEEE membership status: yes/no
 - IEEE member ID when applicable
 - IEEE membership expiry date when applicable
@@ -15,13 +15,12 @@
 
 ### Sales
 
-- All sales are handled by an IEEE exec/admin
+- Public customer sales use the logged-in customer account.
+- Staff/superuser accounts can facilitate purchases for any student account.
 - No anonymous sales
-- No tab means no sale
-- One payment method per sale:
-  - cash
-  - card
-  - student balance
+- No account means no sale
+- Sale purchases use student account balance only.
+- Cash/card are recorded only when staff load money onto an account.
 - Sales do not charge taxes
 - Receipts are not required
 - Completed sales automatically reduce inventory
@@ -53,13 +52,12 @@
   - balance loads
   - restocks
   - inventory
-  - student tabs
+  - accounts
 
 ## Deferred until later
 
 - Split payments
 - Direct Square Terminal integration
-- Student self-checkout
 - Receipts
 - Sales tax collection
 - Public ecommerce storefront

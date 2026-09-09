@@ -3,39 +3,48 @@
 {% block title %}New Sale · Usask IEEE Canteen{% endblock %}
 
 {% block content %}
-  <h1>New Sale</h1>
-  <p class="muted">MVP sale flow: one student tab, up to five item lines, one payment method.</p>
+  <section class="page-panel">
+    <h1>New Sale</h1>
+    <p class="muted">Purchases use prepaid student balances only.</p>
 
-  {% if messages %}
-    {% for message in messages %}
-      <p>{{ message }}</p>
-    {% endfor %}
-  {% endif %}
+    {% if account %}
+      <div class="card">
+        <strong>{{ account.first_name }} {{ account.last_name }}</strong><br>
+        <span class="muted">Current balance: ${{ account.current_balance|floatformat:2 }}</span>
+      </div>
+    {% elif is_staff_user %}
+      <p class="muted">Select the account you are facilitating a sale for.</p>
+    {% else %}
+      <p class="muted">No canteen account is linked to your login. Contact the IEEE vice-chair for help.</p>
+    {% endif %}
 
-  <form method="post">
-    {% csrf_token %}
-    {{ form.non_field_errors }}
+    <form method="post">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
 
-    <p>{{ form.student_tab.label_tag }} {{ form.student_tab }}</p>
-    <p>{{ form.payment_method.label_tag }} {{ form.payment_method }}</p>
+      {% if is_staff_user %}
+        <p>Account: {{ form.account }}</p>
+        <p><strong>Payment method:</strong> Student Balance</p>
+      {% endif %}
 
-    <table>
-      <thead>
-        <tr>
-          <th>Item</th>
-          <th>Quantity</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item_field, quantity_field in form.item_rows %}
+      <table>
+        <thead>
           <tr>
-            <td>{{ item_field.errors }} {{ item_field }}</td>
-            <td>{{ quantity_field.errors }} {{ quantity_field }}</td>
+            <th>Item</th>
+            <th>Quantity</th>
           </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {% for item_field, quantity_field in form.item_rows %}
+            <tr>
+              <td>{{ item_field.errors }} {{ item_field }}</td>
+              <td>{{ quantity_field.errors }} {{ quantity_field }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
 
-    <p><button type="submit">Complete sale</button></p>
-  </form>
+      <p><button type="submit">Complete sale</button></p>
+    </form>
+  </section>
 {% endblock %}

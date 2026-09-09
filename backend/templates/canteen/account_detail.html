@@ -1,0 +1,60 @@
+{% extends "canteen/base.html" %}
+
+{% block title %}Account · Usask IEEE Canteen{% endblock %}
+
+{% block content %}
+  <section class="page-panel">
+    <h1>{{ account.first_name }} {{ account.last_name }}</h1>
+    <p class="muted">Student Number: {{ account.student_id }}</p>
+
+    <div class="cards">
+      <div class="card">
+        <strong>Current balance</strong>
+        <h2>${{ account.current_balance|floatformat:2 }}</h2>
+      </div>
+      <div class="card">
+        <strong>Status</strong>
+        <p>{% if account.is_active %}Active{% else %}Inactive{% endif %}</p>
+      </div>
+      <div class="card">
+        <strong>IEEE pricing</strong>
+        <p>{% if account.has_active_ieee_discount %}Member discount active{% else %}Standard pricing{% endif %}</p>
+      </div>
+    </div>
+
+    <h2>Balance history</h2>
+    <table>
+      <thead><tr><th>Date</th><th>Type</th><th>Payment</th><th>Amount</th><th>Note</th></tr></thead>
+      <tbody>
+        {% for transaction in balance_transactions %}
+          <tr>
+            <td>{{ transaction.created_at }}</td>
+            <td>{{ transaction.get_transaction_type_display }}</td>
+            <td>{{ transaction.get_payment_method_display }}</td>
+            <td>${{ transaction.amount|floatformat:2 }}</td>
+            <td>{{ transaction.note }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5">No balance history yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <h2>Purchase history</h2>
+    <table>
+      <thead><tr><th>Date</th><th>Sale</th><th>Items</th><th>Total</th></tr></thead>
+      <tbody>
+        {% for sale in sales %}
+          <tr>
+            <td>{{ sale.created_at }}</td>
+            <td>#{{ sale.pk }}</td>
+            <td>{% for item in sale.items.all %}{{ item.inventory_item.name }} x{{ item.quantity }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+            <td>${{ sale.total_amount|floatformat:2 }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4">No purchases yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+{% endblock %}
