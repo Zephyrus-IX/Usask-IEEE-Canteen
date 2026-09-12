@@ -202,6 +202,8 @@ docker canteen reset-test-db
 
 Only use `down -v` when you intentionally want to delete the local test database and start over. A plain `docker compose down` should keep the named volume, but deploying from a different folder/project name can create a different Compose volume and make the app look empty. Keep using the same checkout directory, or set a stable project name with `COMPOSE_PROJECT_NAME=usask-ieee-canteen` before the first deploy.
 
+Because `.env` is a committed Dockhand template, local generated secrets can make Git report `.env` as modified. `docker canteen install` and `docker canteen update --branch <branch>` preserve the local `.env` automatically while switching branches, but they refuse to continue if other local files are modified.
+
 Create another admin user:
 
 ```bash

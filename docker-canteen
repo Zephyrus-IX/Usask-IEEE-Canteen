@@ -9,6 +9,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from secrets import token_urlsafe
 from urllib.parse import quote
@@ -116,7 +117,12 @@ def run(command: list[str], *, repo: Path, dry_run: bool = False, capture: bool 
     print("$ " + " ".join(command))
     if dry_run:
         return ""
-    result = subprocess.run(command, cwd=repo, check=True, text=True, capture_output=capture)
+    try:
+        result = subprocess.run(command, cwd=repo, check=True, text=True, capture_output=capture)
+    except subprocess.CalledProcessError as exc:
+        if capture and exc.stderr:
+            print(exc.stderr, file=sys.stderr)
+        abort(f"command failed with exit code {exc.returncode}: {' '.join(command)}")
     return result.stdout.strip() if capture else ""
 
 
@@ -262,11 +268,56 @@ def configure_env(repo: Path, config: dict[str, str], *, dry_run: bool) -> None:
     write_env(repo, replace_env(lines, replacements), dry_run=dry_run)
 
 
+def changed_paths(repo: Path) -> list[str]:
+    status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=repo,
+        check=True,
+        text=True,
+        capture_output=True,
+    ).stdout.splitlines()
+    paths: list[str] = []
+    for line in status:
+        if not line:
+            continue
+        path = line[3:]
+        if " -> " in path:
+            path = path.split(" -> ", 1)[1]
+        paths.append(path)
+    return paths
+
+
 def checkout_branch(repo: Path, branch: str, *, dry_run: bool) -> None:
     require_command("git")
-    run(["git", "fetch", "origin", branch], repo=repo, dry_run=dry_run)
-    run(["git", "checkout", branch], repo=repo, dry_run=dry_run)
-    run(["git", "pull", "--ff-only", "origin", branch], repo=repo, dry_run=dry_run)
+    dirty = changed_paths(repo) if not dry_run else []
+    blocking = [path for path in dirty if path != ".env"]
+    if blocking:
+        abort(
+            "refusing to switch branches with local changes outside .env: "
+            + ", ".join(blocking)
+            + ". Commit, stash, or discard them first."
+        )
+
+    env_path = repo / ".env"
+    preserved_env: Path | None = None
+    if ".env" in dirty:
+        fd, tmp_name = tempfile.mkstemp(prefix="canteen-env-", text=True)
+        os.close(fd)
+        preserved_env = Path(tmp_name)
+        shutil.copy2(env_path, preserved_env)
+        print("Preserving local .env while switching branches.")
+        run(["git", "checkout", "--", ".env"], repo=repo, dry_run=False)
+
+    try:
+        run(["git", "fetch", "origin", branch], repo=repo, dry_run=dry_run)
+        run(["git", "checkout", branch], repo=repo, dry_run=dry_run)
+        run(["git", "pull", "--ff-only", "origin", branch], repo=repo, dry_run=dry_run)
+    finally:
+        if preserved_env is not None:
+            shutil.copy2(preserved_env, env_path)
+            os.chmod(env_path, 0o600)
+            preserved_env.unlink(missing_ok=True)
+            print("Restored local .env after branch switch.")
 
 
 def is_remote_ahead(repo: Path, branch: str, *, dry_run: bool) -> bool:
@@ -330,9 +381,9 @@ def install(args: argparse.Namespace) -> None:
     require_command("docker")
     repo = discover_repo()
     config = interactive_config(repo, args)
-    write_config(config, dry_run=args.dry_run)
     checkout_branch(repo, config["branch"], dry_run=args.dry_run)
     configure_env(repo, config, dry_run=args.dry_run)
+    write_config(config, dry_run=args.dry_run)
     run(compose_args(config) + ["up", "-d", "--build"], repo=repo, dry_run=args.dry_run)
     print("\nInstall started. Useful next commands:")
     print("  docker canteen logs")
