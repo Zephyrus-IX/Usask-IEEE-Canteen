@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-canteen}
       POSTGRES_USER: ${POSTGRES_USER:-canteen}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-canteen-dev-password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -17,15 +17,22 @@ services:
   web:
     build: ./backend
     restart: unless-stopped
-    command: python manage.py runserver 0.0.0.0:8000
+    command:
+      - gunicorn
+      - canteen_project.wsgi:application
+      - --bind=0.0.0.0:8000
+      - --workers=2
+      - --threads=2
+      - --timeout=30
+      - --access-logfile=-
+      - --error-logfile=-
     env_file:
       - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgres://canteen:canteen-dev-password@db:5432/canteen}
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./backend:/app
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+    expose:
+      - "8000"
+
     depends_on:
       db:
         condition: service_healthy

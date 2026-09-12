@@ -20,9 +20,16 @@ cp .env.example .env
 Edit `.env` before starting the stack:
 
 ```env
-DJANGO_SECRET_KEY=<generate-a-long-random-secret>
+DJANGO_SECRET_KEY=<generate-a-long-random-secret-of-at-least-50-characters>
 DJANGO_DEBUG=0
 DJANGO_ALLOWED_HOSTS=<server-ip-or-domain>,localhost,127.0.0.1
+DJANGO_CSRF_TRUSTED_ORIGINS=
+DJANGO_TRUST_CLOUDFLARE_HEADERS=0
+DJANGO_SECURE_COOKIES=0
+DJANGO_SECURE_SSL_REDIRECT=0
+DJANGO_SECURE_HSTS_SECONDS=0
+DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS=0
+DJANGO_SECURE_HSTS_PRELOAD=0
 
 POSTGRES_DB=canteen
 POSTGRES_USER=canteen
@@ -32,15 +39,25 @@ DATABASE_URL=postgres://canteen:<strong-database-password>@db:5432/canteen
 
 Notes:
 
-- Do not reuse the example `DJANGO_SECRET_KEY` or database password for a real deployment.
+- Generate the Django secret with `python -c "import secrets; print(secrets.token_urlsafe(64))"` and copy the result into `.env`.
+- The container refuses to start with a missing, placeholder, or short `DJANGO_SECRET_KEY` while `DJANGO_DEBUG=0`.
+- Do not reuse the example database password for a real deployment.
+- Generate a separate database password and URL-encode it when placing it inside `DATABASE_URL`; the Compose stack refuses to start if either database variable is missing.
 - `DJANGO_ALLOWED_HOSTS` must include the hostname, LAN IP, or domain users will visit.
 - Keep `.env` private. Do not commit it to GitHub.
+- While testing authenticated pages over plain LAN HTTP, leave secure cookies and HTTPS redirects disabled.
+- At the Cloudflare Tunnel cutover, set the exact public hostname in `DJANGO_ALLOWED_HOSTS`, set `DJANGO_CSRF_TRUSTED_ORIGINS=https://<exact-hostname>`, and set `DJANGO_TRUST_CLOUDFLARE_HEADERS=1`, `DJANGO_SECURE_COOKIES=1`, and `DJANGO_SECURE_SSL_REDIRECT=1`.
+- Leave HSTS disabled until the exact HTTPS hostname has been tested. Enable it gradually afterward; do not enable subdomain coverage or preload without reviewing every affected hostname.
 
 ## 3. Build and start Docker Compose
 
+For the current plain-HTTP LAN test deployment, explicitly include the LAN override:
+
 ```bash
-docker compose up -d --build
+docker compose -f compose.yaml -f compose.lan.yaml up -d --build
 ```
+
+The base `compose.yaml` exposes Gunicorn only to other containers. This prevents bypassing Cloudflare once the tunnel service is added. `compose.lan.yaml` is only for temporary trusted-LAN testing and publishes host port `8000`.
 
 Check logs if the web container does not stay up:
 
@@ -48,7 +65,8 @@ Check logs if the web container does not stay up:
 docker compose logs web
 ```
 
-On startup, the web container prints a reminder with the first-deploy commands below.
+On startup, the web container applies database migrations, collects static files, and prints a reminder with the first-deploy commands below.
+The application is served by Gunicorn; WhiteNoise serves the collected static files.
 
 ## 4. Run database migrations
 
@@ -56,7 +74,7 @@ On startup, the web container prints a reminder with the first-deploy commands b
 docker compose exec web python manage.py migrate
 ```
 
-This creates the Django tables, including the admin user table and canteen app tables.
+Startup already applies migrations. This command is safe to run again and verifies that the Django tables are current.
 
 ## 5. Create the first Django admin account
 
@@ -105,6 +123,12 @@ After the first admin login:
 4. Enter initial stock through restocks or inventory adjustments.
 5. Test one small sale with an exec/admin account.
 
+Creating a student account uses the NSID as its username and shows a generated temporary password once. Give that password directly to the student. The student must create a private password at first sign-in. Student Numbers are not collected or stored.
+
+An executive can generate a replacement temporary password from the student's account page. This immediately invalidates the old password and requires password creation again. Five failed attempts for the same NSID and source IP produce a 15-minute automatic lockout.
+
+Migration `0004` removes Student Number and invalidates passwords for every pre-existing non-staff customer account. It intentionally stops before removing the identifier if any old account has no linked NSID user. Because current installations contain test data only, delete/recreate those accounts or reset the test database before upgrading; linked accounts can instead receive a new temporary password after migration.
+
 ## Useful maintenance commands
 
 Create another admin user:
@@ -123,6 +147,6 @@ Apply future database migrations after pulling updates:
 
 ```bash
 git pull
-docker compose up -d --build
+docker compose -f compose.yaml -f compose.lan.yaml up -d --build
 docker compose exec web python manage.py migrate
 ```

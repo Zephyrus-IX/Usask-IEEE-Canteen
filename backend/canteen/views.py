@@ -1,15 +1,28 @@
 import csv
 
+from axes.utils import reset as reset_login_attempts
 from django.contrib import messages
+from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
 from django.http import HttpResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
+from django.utils.decorators import method_decorator
 from django.views import View
+from django.views.decorators.cache import never_cache
 from django.views.generic import CreateView, DetailView, ListView, TemplateView
 
-from .forms import AccountForm, InventoryItemForm, LoadBalanceForm, NewSaleForm, RestockForm
+from .credentials import generate_temporary_password
+from .forms import (
+    AccountForm,
+    InventoryItemForm,
+    LoadBalanceForm,
+    NewSaleForm,
+    RequiredPasswordChangeForm,
+    RestockForm,
+)
 from .models import Account, BalanceTransaction, InventoryItem, RestockEvent, Sale
 from .services import create_sale, load_student_balance, record_restock
 
@@ -135,6 +148,34 @@ class AccountDetailView(LoginRequiredMixin, DetailView):
         return context
 
 
+@method_decorator(never_cache, name="dispatch")
+class RequiredPasswordChangeView(LoginRequiredMixin, View):
+    template_name = "canteen/set_password.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            account = get_user_account(request.user)
+            if request.user.is_staff or account is None or not account.must_change_password:
+                raise PermissionDenied
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request):
+        return render(request, self.template_name, {"form": RequiredPasswordChangeForm(request.user)})
+
+    def post(self, request):
+        form = RequiredPasswordChangeForm(request.user, request.POST)
+        if form.is_valid():
+            user = form.save()
+            account = get_user_account(user)
+            if account:
+                account.must_change_password = False
+                account.save(update_fields=["must_change_password"])
+            update_session_auth_hash(request, user)
+            messages.success(request, "Your password has been created.")
+            return redirect("home")
+        return render(request, self.template_name, {"form": form})
+
+
 class LoadBalanceView(StaffRequiredMixin, LoginRequiredMixin, View):
     template_name = "canteen/load_balance.html"
 
@@ -191,12 +232,12 @@ class ReportsView(StaffRequiredMixin, LoginRequiredMixin, TemplateView):
 
 class ExportSalesCsvView(StaffRequiredMixin, LoginRequiredMixin, View):
     def get(self, request):
-        sales = Sale.objects.select_related("account").order_by("created_at")
+        sales = Sale.objects.select_related("account__user").order_by("created_at")
         rows = (
             [
                 sale.id,
                 sale.created_at.isoformat(),
-                sale.account.student_id,
+                sale.account.user.username if sale.account.user_id else "",
                 f"{sale.account.first_name} {sale.account.last_name}",
                 sale.payment_method,
                 sale.status,
@@ -206,21 +247,21 @@ class ExportSalesCsvView(StaffRequiredMixin, LoginRequiredMixin, View):
         )
         return csv_response(
             "sales.csv",
-            ["sale_id", "created_at", "student_id", "student_name", "payment_method", "status", "total_amount"],
+            ["sale_id", "created_at", "nsid", "student_name", "payment_method", "status", "total_amount"],
             rows,
         )
 
 
 class ExportBalanceLoadsCsvView(StaffRequiredMixin, LoginRequiredMixin, View):
     def get(self, request):
-        transactions = BalanceTransaction.objects.select_related("account").filter(
+        transactions = BalanceTransaction.objects.select_related("account__user").filter(
             transaction_type=BalanceTransaction.TransactionType.LOAD
         ).order_by("created_at")
         rows = (
             [
                 transaction.id,
                 transaction.created_at.isoformat(),
-                transaction.account.student_id,
+                transaction.account.user.username if transaction.account.user_id else "",
                 f"{transaction.account.first_name} {transaction.account.last_name}",
                 transaction.payment_method,
                 transaction.amount,
@@ -230,7 +271,7 @@ class ExportBalanceLoadsCsvView(StaffRequiredMixin, LoginRequiredMixin, View):
         )
         return csv_response(
             "balance-loads.csv",
-            ["transaction_id", "created_at", "student_id", "student_name", "payment_method", "amount", "note"],
+            ["transaction_id", "created_at", "nsid", "student_name", "payment_method", "amount", "note"],
             rows,
         )
 
@@ -272,10 +313,9 @@ class ExportInventoryCsvView(StaffRequiredMixin, LoginRequiredMixin, View):
 
 class ExportAccountsCsvView(StaffRequiredMixin, LoginRequiredMixin, View):
     def get(self, request):
-        accounts = Account.objects.select_related("user").order_by("student_id")
+        accounts = Account.objects.select_related("user").order_by("user__username")
         rows = (
             [
-                account.student_id,
                 account.user.username if account.user_id else "",
                 account.first_name,
                 account.last_name,
@@ -290,7 +330,6 @@ class ExportAccountsCsvView(StaffRequiredMixin, LoginRequiredMixin, View):
         return csv_response(
             "accounts.csv",
             [
-                "student_id",
                 "nsid",
                 "first_name",
                 "last_name",
@@ -319,7 +358,40 @@ class AccountCreateView(StaffRequiredMixin, LoginRequiredMixin, CreateView):
 
     def form_valid(self, form):
         form.instance.created_by = self.request.user
-        return super().form_valid(form)
+        with transaction.atomic():
+            self.object = form.save()
+            reset_login_attempts(username=self.object.user.username)
+        response = render(
+            self.request,
+            "canteen/temporary_password.html",
+            {"account": self.object, "temporary_password": form.temporary_password, "was_reset": False},
+        )
+        response["Cache-Control"] = "max-age=0, no-cache, no-store, must-revalidate, private"
+        return response
+
+
+@method_decorator(never_cache, name="dispatch")
+class AccountResetPasswordView(StaffRequiredMixin, LoginRequiredMixin, View):
+    def post(self, request, pk):
+        account = get_object_or_404(Account.objects.select_related("user"), pk=pk)
+        if not account.user_id:
+            raise PermissionDenied("Only linked customer accounts can receive temporary passwords.")
+        if account.user.is_staff or account.user.is_superuser:
+            raise PermissionDenied("Executive credentials cannot be reset from a customer account.")
+        temporary_password = generate_temporary_password()
+        with transaction.atomic():
+            account.user.set_password(temporary_password)
+            account.user.save(update_fields=["password"])
+            account.must_change_password = True
+            account.save(update_fields=["must_change_password"])
+            reset_login_attempts(username=account.user.username)
+        response = render(
+            request,
+            "canteen/temporary_password.html",
+            {"account": account, "temporary_password": temporary_password, "was_reset": True},
+        )
+        response["Cache-Control"] = "max-age=0, no-cache, no-store, must-revalidate, private"
+        return response
 
 
 class InventoryItemListView(LoginRequiredMixin, ListView):

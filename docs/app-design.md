@@ -26,8 +26,8 @@ Settings
 
 ### Account
 
-- student_id
-- user
+- user (Django user; NSID is the username)
+- must_change_password
 - first_name
 - last_name
 - is_active
@@ -38,6 +38,8 @@ Settings
 - created_by
 - created_at
 - updated_at
+
+Student Numbers are not collected or stored. Account creation and executive-initiated password resets generate a one-time temporary password. The student must replace it at the next sign-in.
 
 ### InventoryItem
 

@@ -1,9 +1,11 @@
 from datetime import date
 from decimal import Decimal
 
+from django.contrib.auth.models import User
 from django.test import TestCase
 
 from .models import (
+    Account,
     BalanceTransaction,
     InventoryAdjustment,
     InventoryItem,
@@ -12,14 +14,17 @@ from .models import (
     RestockTaxLine,
     Sale,
     SaleItem,
-    Account,
 )
 
 
 class CanteenModelTests(TestCase):
+    def create_account(self, username, **kwargs):
+        user = User.objects.create_user(username=username, password="customer-password")
+        return Account.objects.create(user=user, **kwargs)
+
     def test_sale_item_uses_member_price_and_calculates_line_total(self):
-        tab = Account.objects.create(
-            student_id="12345678",
+        tab = self.create_account(
+            "abc123",
             first_name="Alex",
             last_name="Student",
             is_ieee_member=True,
@@ -39,7 +44,7 @@ class CanteenModelTests(TestCase):
         self.assertEqual(sale_item.line_total, Decimal("2.50"))
 
     def test_student_balance_is_sum_of_balance_transactions(self):
-        tab = Account.objects.create(student_id="12345678", first_name="Alex", last_name="Student")
+        tab = self.create_account("xyz789", first_name="Alex", last_name="Student")
 
         BalanceTransaction.objects.create(
             account=tab,

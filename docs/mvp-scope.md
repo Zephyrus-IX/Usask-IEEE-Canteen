@@ -4,7 +4,10 @@
 
 ### Accounts
 
-- Student ID is required
+- NSID is required and becomes the Django username
+- Student Number is not collected or stored
+- Account creation generates a one-time temporary password
+- Students must create a private password on first sign-in and after an executive reset
 - First and last name are required
 - Account status: active/inactive
 - IEEE membership status: yes/no
@@ -63,3 +66,4 @@
 - Public ecommerce storefront
 - Polished UI
 - Full-screen TUI
+- Executive-triggered encrypted PostgreSQL backup export to a removable USB drive, including backup verification, safe-eject guidance, retention rules, and a tested restore workflow

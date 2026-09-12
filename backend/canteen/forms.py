@@ -1,6 +1,8 @@
 from django import forms
+from django.contrib.auth.forms import SetPasswordForm
 from django.contrib.auth.models import User
 
+from .credentials import generate_temporary_password
 from .models import Account, BalanceTransaction, InventoryItem, TaxRate
 
 SALE_ITEM_ROW_COUNT = 5
@@ -13,7 +15,6 @@ class AccountForm(forms.ModelForm):
     class Meta:
         model = Account
         fields = [
-            "student_id",
             "first_name",
             "last_name",
             "is_active",
@@ -22,7 +23,6 @@ class AccountForm(forms.ModelForm):
             "ieee_membership_expires_on",
             "notes",
         ]
-        labels = {"student_id": "Student Number"}
         widgets = {
             "ieee_membership_expires_on": forms.DateInput(attrs={"type": "date"}),
             "notes": forms.Textarea(attrs={"rows": 3}),
@@ -32,7 +32,6 @@ class AccountForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.order_fields([
             "nsid",
-            "student_id",
             "first_name",
             "last_name",
             "is_active",
@@ -56,14 +55,14 @@ class AccountForm(forms.ModelForm):
     def save(self, commit=True):
         account = super().save(commit=False)
         nsid = self.cleaned_data["nsid"]
-        student_number = self.cleaned_data["student_id"]
         if account.user_id:
             user = account.user
             user.username = nsid
-            user.set_password(student_number)
         else:
             user = User(username=nsid, first_name=account.first_name, last_name=account.last_name)
-            user.set_password(student_number)
+            self.temporary_password = generate_temporary_password()
+            user.set_password(self.temporary_password)
+            account.must_change_password = True
         user.first_name = account.first_name
         user.last_name = account.last_name
         if commit:
@@ -74,6 +73,10 @@ class AccountForm(forms.ModelForm):
         else:
             account.user = user
         return account
+
+
+class RequiredPasswordChangeForm(SetPasswordForm):
+    pass
 
 
 class InventoryItemForm(forms.ModelForm):
@@ -109,7 +112,7 @@ class LoadBalanceForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["account"].queryset = Account.objects.filter(is_active=True).order_by("student_id")
+        self.fields["account"].queryset = Account.objects.filter(is_active=True).order_by("user__username")
 
 
 class NewSaleForm(forms.Form):
@@ -124,7 +127,7 @@ class NewSaleForm(forms.Form):
         self.staff_user = staff_user
         if staff_user:
             self.fields["account"].required = True
-            self.fields["account"].queryset = Account.objects.filter(is_active=True).order_by("student_id")
+            self.fields["account"].queryset = Account.objects.filter(is_active=True).order_by("user__username")
         else:
             self.fields.pop("account")
         item_queryset = InventoryItem.objects.filter(is_active=True, quantity_on_hand__gt=0).order_by("name")

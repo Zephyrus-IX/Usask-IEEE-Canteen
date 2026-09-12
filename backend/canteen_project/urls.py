@@ -1,11 +1,14 @@
 from django.contrib import admin
-from django.urls import include, path
+from django.contrib.auth import views as auth_views
+from django.urls import path
 
 from canteen import views
 
 urlpatterns = [
     path("", views.home, name="home"),
-    path("accounts/", include("django.contrib.auth.urls")),
+    path("accounts/login/", auth_views.LoginView.as_view(), name="login"),
+    path("accounts/logout/", auth_views.LogoutView.as_view(), name="logout"),
+    path("accounts/set-password/", views.RequiredPasswordChangeView.as_view(), name="set-password"),
     path("sales/new/", views.NewSaleView.as_view(), name="new-sale"),
     path("accounts/load-balance/", views.LoadBalanceView.as_view(), name="load-balance"),
     path("restocks/new/", views.RestockCreateView.as_view(), name="restock-create"),
@@ -17,6 +20,11 @@ urlpatterns = [
     path("reports/accounts.csv", views.ExportAccountsCsvView.as_view(), name="export-accounts-csv"),
     path("accounts/me/", views.AccountDetailView.as_view(), name="account-detail"),
     path("accounts/<int:pk>/", views.AccountDetailView.as_view(), name="account-detail-staff"),
+    path(
+        "accounts/<int:pk>/reset-password/",
+        views.AccountResetPasswordView.as_view(),
+        name="account-reset-password",
+    ),
     path("accounts/", views.AccountListView.as_view(), name="account-list"),
     path("accounts/new/", views.AccountCreateView.as_view(), name="account-create"),
     path("inventory/", views.InventoryItemListView.as_view(), name="inventory-item-list"),
