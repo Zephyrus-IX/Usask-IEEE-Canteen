@@ -23,3 +23,27 @@ Required safeguards:
 - Record the authorization boundary so only active staff/superusers can start or download a backup.
 
 The restore procedure is part of this feature, not a later optional task. A backup is not considered working until a clean restore has been demonstrated.
+
+## Published Docker image through GitHub Container Registry
+
+Status: deferred until the app reaches the production-deployment/fine-tuning stage.
+
+Create a released Docker image for the Django/Gunicorn web app so deployed systems can pull a known image instead of rebuilding from Git source on every update.
+
+Target shape:
+
+```text
+web container:       ghcr.io/zephyrus-ix/usask-ieee-canteen:<version>
+postgres container:  official postgres image with persistent volume
+```
+
+Keep PostgreSQL as a separate container. Do not bundle the database into the app image; separate containers make backups, upgrades, restores, and data safety simpler.
+
+Implementation notes for later:
+
+- Publish images from GitHub Actions after validated merges/releases on `main`.
+- Tag images with release versions, e.g. `v1.3.0`, and optionally `latest` only after a stable production release policy exists.
+- Keep `compose.yaml` able to reference the image instead of `build:` for production deployments.
+- Preserve the existing source-build path for development/test deployments until image releases are proven.
+- Update `docker canteen update` so production mode can pull the latest approved image rather than rebuilding locally.
+- Verify image startup with migrations, static assets, login, admin access, and a smoke sale before recommending it for production.
