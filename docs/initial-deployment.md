@@ -11,13 +11,11 @@ cd Usask-IEEE-Canteen
 
 If the repository is private, the deployment machine needs GitHub access through a user account, a fine-grained read-only token, or a read-only deploy key.
 
-## 2. Create the environment file
+## 2. Configure the environment file
 
-```bash
-cp .env.example .env
-```
+Dockhand reads the committed `.env` template directly. Edit `.env` in Dockhand or on the deployment host before starting the stack. The file contains placeholders only; do not commit real generated secrets back to GitHub.
 
-Edit `.env` before starting the stack:
+Required production values:
 
 ```env
 DJANGO_SECRET_KEY=<generate-a-long-random-secret-of-at-least-50-characters>
@@ -44,7 +42,7 @@ Notes:
 - Do not reuse the example database password for a real deployment.
 - Generate a separate database password and URL-encode it when placing it inside `DATABASE_URL`; the Compose stack refuses to start if either database variable is missing.
 - `DJANGO_ALLOWED_HOSTS` must include the hostname, LAN IP, or domain users will visit.
-- Keep `.env` private. Do not commit it to GitHub.
+- Keep real `.env` values private. The committed `.env` file is a Dockhand template only; do not commit the generated secret values.
 - While testing authenticated pages over plain LAN HTTP, leave secure cookies and HTTPS redirects disabled.
 - At the Cloudflare Tunnel cutover, set the exact public hostname in `DJANGO_ALLOWED_HOSTS`, set `DJANGO_CSRF_TRUSTED_ORIGINS=https://<exact-hostname>`, and set `DJANGO_TRUST_CLOUDFLARE_HEADERS=1`, `DJANGO_SECURE_COOKIES=1`, and `DJANGO_SECURE_SSL_REDIRECT=1`.
 - Leave HSTS disabled until the exact HTTPS hostname has been tested. Enable it gradually afterward; do not enable subdomain coverage or preload without reviewing every affected hostname.

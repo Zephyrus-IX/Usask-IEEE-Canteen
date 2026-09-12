@@ -33,7 +33,7 @@ backend/             Django project and canteen app
 compose.yaml         Local/self-hosted Docker Compose stack
 compose.lan.yaml     Explicit host-port override for temporary LAN testing
 docs/                Design notes, deployment guide, and MVP scope
-.env.example         Example environment variables
+.env                 Dockhand environment template with placeholder values
 ```
 
 ## Deployment
@@ -45,7 +45,7 @@ Future work, including encrypted PostgreSQL exports to removable USB storage, is
 Quick start:
 
 ```bash
-cp .env.example .env
+# Edit .env first: replace the placeholder Django and PostgreSQL secrets.
 docker compose -f compose.yaml -f compose.lan.yaml up -d --build
 docker compose exec web python manage.py migrate
 docker compose exec web python manage.py createsuperuser
