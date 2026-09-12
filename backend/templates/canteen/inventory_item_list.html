@@ -7,6 +7,12 @@
     <h1>{% if user.is_staff %}Inventory{% else %}Items for Sale{% endif %}</h1>
     <p class="muted">Current canteen stock and prices.</p>
     {% if user.is_staff %}
+      <form class="search-bar" method="get" role="search">
+        <label for="inventory-search">Search inventory</label>
+        <input id="inventory-search" type="search" name="q" value="{{ search_query }}" placeholder="Search item name or notes">
+        <button type="submit">Search</button>
+        {% if search_query %}<a class="button" href="{% url 'inventory-item-list' %}">Clear</a>{% endif %}
+      </form>
       <p class="actions"><a class="button" href="{% url 'inventory-item-create' %}">Create inventory item</a></p>
     {% endif %}
 

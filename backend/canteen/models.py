@@ -1,10 +1,9 @@
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
 from django.db import models
 from django.db.models import Sum
 from django.utils import timezone
-
 
 MONEY_QUANT = Decimal("0.01")
 
@@ -18,12 +17,10 @@ class Account(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="canteen_account",
-        blank=True,
-        null=True,
     )
-    student_id = models.CharField(max_length=32, unique=True)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
+    must_change_password = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
     is_ieee_member = models.BooleanField(default=False)
     ieee_member_id = models.CharField(max_length=64, blank=True)
@@ -40,10 +37,11 @@ class Account(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["student_id"]
+        ordering = ["user__username", "last_name", "first_name"]
 
     def __str__(self) -> str:
-        return f"{self.student_id} - {self.first_name} {self.last_name}"
+        nsid = self.user.username if self.user_id else "No NSID"
+        return f"{nsid} - {self.first_name} {self.last_name}"
 
     @property
     def has_active_ieee_discount(self) -> bool:

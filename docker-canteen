@@ -1,0 +1,516 @@
+#!/usr/bin/env python3
+"""Docker CLI plugin for the USask IEEE canteen deployment."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+from secrets import token_urlsafe
+from urllib.parse import quote
+
+APP_NAME = "canteen"
+CONFIG_DIR = Path.home() / ".config" / APP_NAME
+CONFIG_FILE = CONFIG_DIR / "config.json"
+REPO_FILE = CONFIG_DIR / "repo"
+PLUGIN_PATH = Path.home() / ".docker" / "cli-plugins" / "docker-canteen"
+PLACEHOLDER_MARKERS = ("change", "replace", "placeholder", "paste", "generate", "<", ">")
+
+
+class FriendlyParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        self.print_help(sys.stderr)
+        self.exit(2, f"\nError: {message}\n")
+
+
+def emit_metadata() -> None:
+    print(
+        json.dumps(
+            {
+                "SchemaVersion": "0.1.0",
+                "Vendor": "USask IEEE",
+                "Version": "0.2.0",
+                "ShortDescription": "Manage the USask IEEE Canteen deployment",
+            }
+        )
+    )
+
+
+def normalize_docker_plugin_args() -> None:
+    """Docker may invoke CLI plugins as `docker-canteen canteen ...`.
+
+    The plugin itself is already named canteen, so strip that duplicate token.
+    """
+
+    if len(sys.argv) > 1 and sys.argv[1] == APP_NAME:
+        del sys.argv[1]
+
+
+
+def abort(message: str) -> None:
+    print(f"Error: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+
+def require_command(name: str) -> None:
+    if shutil.which(name) is None:
+        abort(f"{name!r} was not found on PATH")
+
+
+def is_repo(path: Path) -> bool:
+    return (path / "compose.yaml").exists() and (path / "backend" / "manage.py").exists()
+
+
+def read_config() -> dict[str, str]:
+    config: dict[str, str] = {}
+    if CONFIG_FILE.exists():
+        try:
+            loaded = json.loads(CONFIG_FILE.read_text())
+            if isinstance(loaded, dict):
+                config.update({str(k): str(v) for k, v in loaded.items()})
+        except json.JSONDecodeError:
+            abort(f"config file is invalid JSON: {CONFIG_FILE}")
+    elif REPO_FILE.exists():
+        repo = REPO_FILE.read_text().strip()
+        if repo:
+            config["repo"] = repo
+    return config
+
+
+def write_config(config: dict[str, str], *, dry_run: bool) -> None:
+    if dry_run:
+        safe_config = {key: value for key, value in config.items() if key not in {"secret"}}
+        print(f"Would save deployment config: {safe_config}")
+        return
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    CONFIG_FILE.write_text(json.dumps(config, indent=2, sort_keys=True) + "\n")
+    os.chmod(CONFIG_FILE, 0o600)
+
+
+def discover_repo() -> Path:
+    env_repo = os.environ.get("CANTEEN_REPO")
+    config = read_config()
+    candidates: list[Path] = []
+    if env_repo:
+        candidates.append(Path(env_repo).expanduser())
+    if config.get("repo"):
+        candidates.append(Path(config["repo"]).expanduser())
+    candidates.extend([Path.cwd(), *Path.cwd().parents, Path(__file__).resolve().parent])
+
+    for candidate in candidates:
+        candidate = candidate.resolve()
+        if is_repo(candidate):
+            return candidate
+
+    abort(
+        "could not find the canteen repository. Run from the repo, set CANTEEN_REPO, "
+        "or run ./docker-canteen install-plugin from the repo."
+    )
+
+
+def run(command: list[str], *, repo: Path, dry_run: bool = False, capture: bool = False) -> str:
+    print("$ " + " ".join(command))
+    if dry_run:
+        return ""
+    try:
+        result = subprocess.run(command, cwd=repo, check=True, text=True, capture_output=capture)
+    except subprocess.CalledProcessError as exc:
+        if capture and exc.stderr:
+            print(exc.stderr, file=sys.stderr)
+        abort(f"command failed with exit code {exc.returncode}: {' '.join(command)}")
+    return result.stdout.strip() if capture else ""
+
+
+def compose_args(config: dict[str, str]) -> list[str]:
+    command = ["docker", "compose", "-f", "compose.yaml"]
+    if config.get("mode") == "lan":
+        command.extend(["-f", "compose.lan.yaml"])
+    return command
+
+
+def prompt_choice(question: str, choices: list[str], *, default: str | None = None) -> str:
+    display = "/".join(choice.upper() if choice == default else choice for choice in choices)
+    while True:
+        answer = input(f"{question} [{display}]: ").strip().lower()
+        if not answer and default:
+            return default
+        matches = [choice for choice in choices if choice.startswith(answer)]
+        if len(matches) == 1:
+            return matches[0]
+        print(f"Choose one of: {', '.join(choices)}")
+
+
+def prompt_text(question: str, *, default: str | None = None, required: bool = False) -> str:
+    suffix = f" [{default}]" if default is not None else ""
+    while True:
+        answer = input(f"{question}{suffix}: ").strip()
+        if not answer and default is not None:
+            return default
+        if answer or not required:
+            return answer
+        print("This value is required.")
+
+
+def load_env(repo: Path) -> tuple[list[str], dict[str, str]]:
+    env_path = repo / ".env"
+    if not env_path.exists():
+        abort(".env is missing; restore the committed .env template before installing")
+
+    lines = env_path.read_text().splitlines()
+    values: dict[str, str] = {}
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        values[key] = value
+    return lines, values
+
+
+def is_placeholder(value: str | None) -> bool:
+    if value is None:
+        return True
+    normalized = value.strip().lower()
+    if not normalized:
+        return True
+    return any(marker in normalized for marker in PLACEHOLDER_MARKERS)
+
+
+def replace_env(lines: list[str], replacements: dict[str, str]) -> list[str]:
+    remaining = dict(replacements)
+    updated: list[str] = []
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            updated.append(line)
+            continue
+        key = stripped.split("=", 1)[0]
+        if key in remaining:
+            updated.append(f"{key}={remaining.pop(key)}")
+        else:
+            updated.append(line)
+
+    if remaining:
+        if updated and updated[-1].strip():
+            updated.append("")
+        for key, value in remaining.items():
+            updated.append(f"{key}={value}")
+
+    return updated
+
+
+def write_env(repo: Path, lines: list[str], *, dry_run: bool) -> None:
+    if dry_run:
+        print("Would update .env values that are placeholders or deployment-mode settings.")
+        return
+    env_path = repo / ".env"
+    env_path.write_text("\n".join(lines) + "\n")
+    os.chmod(env_path, 0o600)
+    print("Updated .env and restricted it to owner read/write permissions.")
+
+
+def configure_env(repo: Path, config: dict[str, str], *, dry_run: bool) -> None:
+    lines, values = load_env(repo)
+    replacements: dict[str, str] = {}
+
+    postgres_db = values.get("POSTGRES_DB") or "canteen"
+    postgres_user = values.get("POSTGRES_USER") or "canteen"
+    postgres_password = values.get("POSTGRES_PASSWORD")
+
+    if is_placeholder(values.get("DJANGO_SECRET_KEY")):
+        replacements["DJANGO_SECRET_KEY"] = token_urlsafe(64)
+    if is_placeholder(postgres_password):
+        postgres_password = token_urlsafe(48)
+        replacements["POSTGRES_PASSWORD"] = postgres_password
+    if is_placeholder(values.get("DATABASE_URL")) or "POSTGRES_PASSWORD" in replacements:
+        password_for_url = quote(postgres_password or "", safe="")
+        replacements["DATABASE_URL"] = f"postgres://{postgres_user}:{password_for_url}@db:5432/{postgres_db}"
+
+    replacements.setdefault("POSTGRES_DB", postgres_db)
+    replacements.setdefault("POSTGRES_USER", postgres_user)
+
+    if config["mode"] == "lan":
+        replacements.update(
+            {
+                "DJANGO_DEBUG": "0",
+                "DJANGO_ALLOWED_HOSTS": config.get("allowed_hosts", "localhost,127.0.0.1,[::1]"),
+                "DJANGO_CSRF_TRUSTED_ORIGINS": "",
+                "DJANGO_TRUST_CLOUDFLARE_HEADERS": "0",
+                "DJANGO_SECURE_COOKIES": "0",
+                "DJANGO_SECURE_SSL_REDIRECT": "0",
+                "DJANGO_SECURE_HSTS_SECONDS": "0",
+                "DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS": "0",
+                "DJANGO_SECURE_HSTS_PRELOAD": "0",
+            }
+        )
+    else:
+        host = config["host"]
+        replacements.update(
+            {
+                "DJANGO_DEBUG": "0",
+                "DJANGO_ALLOWED_HOSTS": host,
+                "DJANGO_CSRF_TRUSTED_ORIGINS": f"https://{host}",
+                "DJANGO_TRUST_CLOUDFLARE_HEADERS": "1",
+                "DJANGO_SECURE_COOKIES": "1",
+                "DJANGO_SECURE_SSL_REDIRECT": "1",
+                "DJANGO_SECURE_HSTS_SECONDS": "0",
+                "DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS": "0",
+                "DJANGO_SECURE_HSTS_PRELOAD": "0",
+            }
+        )
+
+    write_env(repo, replace_env(lines, replacements), dry_run=dry_run)
+
+
+def changed_paths(repo: Path) -> list[str]:
+    status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=repo,
+        check=True,
+        text=True,
+        capture_output=True,
+    ).stdout.splitlines()
+    paths: list[str] = []
+    for line in status:
+        if not line:
+            continue
+        path = line[3:]
+        if " -> " in path:
+            path = path.split(" -> ", 1)[1]
+        paths.append(path)
+    return paths
+
+
+def checkout_branch(repo: Path, branch: str, *, dry_run: bool) -> None:
+    require_command("git")
+    dirty = changed_paths(repo) if not dry_run else []
+    blocking = [path for path in dirty if path != ".env"]
+    if blocking:
+        abort(
+            "refusing to switch branches with local changes outside .env: "
+            + ", ".join(blocking)
+            + ". Commit, stash, or discard them first."
+        )
+
+    env_path = repo / ".env"
+    preserved_env: Path | None = None
+    if ".env" in dirty:
+        fd, tmp_name = tempfile.mkstemp(prefix="canteen-env-", text=True)
+        os.close(fd)
+        preserved_env = Path(tmp_name)
+        shutil.copy2(env_path, preserved_env)
+        print("Preserving local .env while switching branches.")
+        run(["git", "checkout", "--", ".env"], repo=repo, dry_run=False)
+
+    try:
+        run(["git", "fetch", "origin", branch], repo=repo, dry_run=dry_run)
+        run(["git", "checkout", branch], repo=repo, dry_run=dry_run)
+        run(["git", "pull", "--ff-only", "origin", branch], repo=repo, dry_run=dry_run)
+    finally:
+        if preserved_env is not None:
+            shutil.copy2(preserved_env, env_path)
+            os.chmod(env_path, 0o600)
+            preserved_env.unlink(missing_ok=True)
+            print("Restored local .env after branch switch.")
+
+
+def is_remote_ahead(repo: Path, branch: str, *, dry_run: bool) -> bool:
+    if dry_run:
+        print(f"Would check whether origin/{branch} is ahead of local {branch}.")
+        return True
+    run(["git", "fetch", "origin", branch], repo=repo)
+    local = run(["git", "rev-parse", branch], repo=repo, capture=True)
+    remote = run(["git", "rev-parse", f"origin/{branch}"], repo=repo, capture=True)
+    if local == remote:
+        print(f"Already up to date on {branch}; no rebuild needed.")
+        return False
+    base = run(["git", "merge-base", branch, f"origin/{branch}"], repo=repo, capture=True)
+    if base == remote:
+        print(f"Local {branch} is ahead of origin/{branch}; no automatic pull performed.")
+        return False
+    if base != local:
+        abort(f"{branch} and origin/{branch} have diverged; resolve Git state manually")
+    return True
+
+
+def require_setup(config: dict[str, str]) -> None:
+    missing = [key for key in ("repo", "mode", "branch") if not config.get(key)]
+    if missing:
+        abort("deployment is not configured yet. Run `docker canteen install` first.")
+
+
+def interactive_config(repo: Path, args: argparse.Namespace) -> dict[str, str]:
+    mode = args.mode or prompt_choice("Deployment target", ["lan", "production"], default="lan")
+    branch_default = "main" if mode == "production" else "dev"
+    branch = args.branch or prompt_choice("Git branch", ["main", "dev"], default=branch_default)
+
+    config = {"repo": str(repo), "mode": mode, "branch": branch}
+    if mode == "lan":
+        if args.allowed_hosts:
+            config["allowed_hosts"] = args.allowed_hosts
+        elif args.mode or args.dry_run:
+            config["allowed_hosts"] = "localhost,127.0.0.1,[::1]"
+        else:
+            config["allowed_hosts"] = prompt_text("LAN allowed hosts", default="localhost,127.0.0.1,[::1]")
+    else:
+        config["host"] = args.host or prompt_text("Exact Cloudflare HTTPS hostname", required=True)
+    return config
+
+
+def install_plugin(args: argparse.Namespace) -> None:
+    repo = discover_repo()
+    config = read_config()
+    config["repo"] = str(repo)
+    if not args.dry_run:
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        write_config(config, dry_run=False)
+        PLUGIN_PATH.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(Path(__file__).resolve(), PLUGIN_PATH)
+        os.chmod(PLUGIN_PATH, 0o755)
+    print(f"Installed docker canteen plugin for repo: {repo}")
+    print("Next: docker canteen install")
+
+
+def install(args: argparse.Namespace) -> None:
+    require_command("docker")
+    repo = discover_repo()
+    config = interactive_config(repo, args)
+    checkout_branch(repo, config["branch"], dry_run=args.dry_run)
+    configure_env(repo, config, dry_run=args.dry_run)
+    write_config(config, dry_run=args.dry_run)
+    run(compose_args(config) + ["up", "-d", "--build"], repo=repo, dry_run=args.dry_run)
+    print("\nInstall started. Useful next commands:")
+    print("  docker canteen logs")
+    print("  docker canteen createsuperuser")
+    print("  docker canteen status")
+
+
+def update(args: argparse.Namespace) -> None:
+    require_command("docker")
+    require_command("git")
+    config = read_config()
+    require_setup(config)
+    repo = Path(config["repo"])
+    branch = args.branch or config["branch"]
+    if not is_remote_ahead(repo, branch, dry_run=args.dry_run) and not args.force:
+        return
+    run(["git", "checkout", branch], repo=repo, dry_run=args.dry_run)
+    run(["git", "pull", "--ff-only", "origin", branch], repo=repo, dry_run=args.dry_run)
+    run(compose_args(config) + ["up", "-d", "--build"], repo=repo, dry_run=args.dry_run)
+    if not args.dry_run and args.branch:
+        config["branch"] = branch
+        write_config(config, dry_run=False)
+    print("\nUpdate complete. The database volume was preserved.")
+
+
+def logs(args: argparse.Namespace) -> None:
+    require_command("docker")
+    config = read_config()
+    require_setup(config)
+    run(compose_args(config) + ["logs", "-f", "web"], repo=Path(config["repo"]))
+
+
+def status(args: argparse.Namespace) -> None:
+    require_command("docker")
+    config = read_config()
+    require_setup(config)
+    run(compose_args(config) + ["ps"], repo=Path(config["repo"]))
+
+
+def createsuperuser(args: argparse.Namespace) -> None:
+    require_command("docker")
+    config = read_config()
+    require_setup(config)
+    run(compose_args(config) + ["exec", "web", "python", "manage.py", "createsuperuser"], repo=Path(config["repo"]))
+
+
+def config_show(args: argparse.Namespace) -> None:
+    config = read_config()
+    require_setup(config)
+    print(f"Repository: {config['repo']}")
+    print(f"Deployment: {config['mode']}")
+    print(f"Branch:     {config['branch']}")
+    if config.get("host"):
+        print(f"Hostname:   {config['host']}")
+    if config.get("allowed_hosts"):
+        print(f"LAN hosts:  {config['allowed_hosts']}")
+
+
+def reset_test_db(args: argparse.Namespace) -> None:
+    require_command("docker")
+    config = read_config()
+    require_setup(config)
+    if not args.yes_delete_data:
+        confirmation = input("This deletes the PostgreSQL Docker volume. Type DELETE to continue: ")
+        if confirmation != "DELETE":
+            abort("reset cancelled")
+    run(compose_args(config) + ["down", "-v"], repo=Path(config["repo"]), dry_run=args.dry_run)
+    print("Database volume removed. Run docker canteen install to create a fresh test database.")
+
+
+def main() -> None:
+    normalize_docker_plugin_args()
+    if len(sys.argv) > 1 and sys.argv[1] == "docker-cli-plugin-metadata":
+        emit_metadata()
+        return
+
+    parser = FriendlyParser(
+        prog="docker canteen",
+        description="Manage the USask IEEE Canteen Docker deployment.",
+        epilog=(
+            "Typical flow:\n"
+            "  ./docker-canteen install-plugin\n"
+            "  docker canteen install\n"
+            "  docker canteen logs\n"
+            "  docker canteen createsuperuser\n\n"
+            "After install, the selected deployment mode and branch are remembered. "
+            "Normal commands do not need --lan or --production."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True, metavar="command")
+
+    plugin_parser = subparsers.add_parser("install-plugin", help="install the Docker CLI plugin")
+    plugin_parser.add_argument("--dry-run", action="store_true", help="show actions without installing")
+    plugin_parser.set_defaults(func=install_plugin)
+
+    install_parser = subparsers.add_parser("install", help="interactive first-time setup and start")
+    install_parser.add_argument("--mode", choices=("lan", "production"), help="skip the deployment target prompt")
+    install_parser.add_argument("--branch", choices=("main", "dev"), help="skip the branch prompt")
+    install_parser.add_argument("--host", help="production HTTPS hostname")
+    install_parser.add_argument("--allowed-hosts", help="LAN hostnames/IPs for DJANGO_ALLOWED_HOSTS")
+    install_parser.add_argument("--dry-run", action="store_true", help="show actions without writing .env or starting containers")
+    install_parser.set_defaults(func=install)
+
+    update_parser = subparsers.add_parser("update", help="update if the configured branch is ahead")
+    update_parser.add_argument("--branch", choices=("main", "dev"), help="temporarily update from a different branch")
+    update_parser.add_argument("--force", action="store_true", help="rebuild even when the remote branch is not ahead")
+    update_parser.add_argument("--dry-run", action="store_true", help="show actions without running them")
+    update_parser.set_defaults(func=update)
+
+    for name, handler, help_text in (
+        ("logs", logs, "follow web logs"),
+        ("status", status, "show service status"),
+        ("createsuperuser", createsuperuser, "create a Django admin user"),
+        ("config", config_show, "show remembered deployment settings"),
+    ):
+        command_parser = subparsers.add_parser(name, help=help_text)
+        command_parser.set_defaults(func=handler)
+
+    reset_parser = subparsers.add_parser("reset-test-db", help="delete the database volume after confirmation")
+    reset_parser.add_argument("--yes-delete-data", action="store_true", help="skip the DELETE confirmation prompt")
+    reset_parser.add_argument("--dry-run", action="store_true", help="show actions without deleting anything")
+    reset_parser.set_defaults(func=reset_test_db)
+
+    args = parser.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()

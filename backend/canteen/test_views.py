@@ -19,7 +19,16 @@ from .models import (
 class ManagementViewTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="exec", password="password", is_staff=True)
+        self.account_sequence = 0
         self.client.force_login(self.user)
+
+    def create_account(self, **kwargs):
+        self.account_sequence += 1
+        user = User.objects.create_user(
+            username=f"student{self.account_sequence}",
+            password="customer-password",
+        )
+        return Account.objects.create(user=user, **kwargs)
 
     def test_public_home_shows_customer_options_only(self):
         self.client.logout()
@@ -47,7 +56,7 @@ class ManagementViewTests(TestCase):
 
     def test_customer_home_shows_customer_options_only(self):
         customer = User.objects.create_user(username="abc123", password="12345678")
-        Account.objects.create(user=customer, student_id="12345678", first_name="Alex", last_name="Student")
+        Account.objects.create(user=customer, first_name="Alex", last_name="Student", must_change_password=False)
         self.client.force_login(customer)
 
         response = self.client.get(reverse("home"))
@@ -67,8 +76,21 @@ class ManagementViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "NSID")
-        self.assertContains(response, "Student Number")
+        self.assertContains(response, "Password")
+        self.assertNotContains(response, "Student Number")
         self.assertContains(response, "vice-chair")
+
+    def test_invalid_login_error_is_highlighted_in_red_alert(self):
+        self.client.logout()
+
+        response = self.client.post(
+            reverse("login"),
+            {"username": "missing", "password": "wrong-password"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="alert alert-error"')
+        self.assertContains(response, "Invalid NSID or password")
 
     def test_login_without_next_redirects_to_canteen_home(self):
         self.client.logout()
@@ -92,7 +114,7 @@ class ManagementViewTests(TestCase):
 
     def test_staff_only_pages_reject_customer_users(self):
         customer = User.objects.create_user(username="abc123", password="12345678")
-        Account.objects.create(user=customer, student_id="12345678", first_name="Alex", last_name="Student")
+        Account.objects.create(user=customer, first_name="Alex", last_name="Student", must_change_password=False)
         self.client.force_login(customer)
 
         response = self.client.get(reverse("account-list"))
@@ -100,20 +122,28 @@ class ManagementViewTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_account_list_shows_accounts_and_create_link(self):
-        Account.objects.create(student_id="12345678", first_name="Alex", last_name="Student")
+        self.create_account(first_name="Alex", last_name="Student")
 
         response = self.client.get(reverse("account-list"))
 
-        self.assertContains(response, "12345678")
         self.assertContains(response, "Alex Student")
         self.assertContains(response, reverse("account-create"))
 
-    def test_create_account_creates_login_user_with_nsid_and_student_number(self):
+    def test_account_list_search_filters_by_nsid_and_name(self):
+        self.create_account(first_name="Alex", last_name="Student")
+        self.create_account(first_name="Jordan", last_name="Member")
+
+        response = self.client.get(reverse("account-list"), {"q": "jordan"})
+
+        self.assertContains(response, "Jordan Member")
+        self.assertNotContains(response, "Alex Student")
+        self.assertContains(response, 'name="q"')
+
+    def test_create_account_generates_temporary_password_for_nsid(self):
         response = self.client.post(
             reverse("account-create"),
             {
                 "nsid": "abc123",
-                "student_id": "12345678",
                 "first_name": "Alex",
                 "last_name": "Student",
                 "is_active": "on",
@@ -124,16 +154,17 @@ class ManagementViewTests(TestCase):
             },
         )
 
-        self.assertRedirects(response, reverse("account-list"))
-        account = Account.objects.get(student_id="12345678")
+        self.assertEqual(response.status_code, 200)
+        account = Account.objects.get(user__username="abc123")
         self.assertEqual(account.first_name, "Alex")
         self.assertEqual(account.created_by, self.user)
         self.assertEqual(account.user.username, "abc123")
-        self.assertTrue(account.user.check_password("12345678"))
+        self.assertTrue(account.user.check_password(response.context["temporary_password"]))
+        self.assertTrue(account.must_change_password)
 
     def test_customer_account_detail_shows_own_balance_and_history(self):
         customer = User.objects.create_user(username="abc123", password="12345678")
-        account = Account.objects.create(user=customer, student_id="12345678", first_name="Alex", last_name="Student")
+        account = Account.objects.create(user=customer, first_name="Alex", last_name="Student", must_change_password=False)
         BalanceTransaction.objects.create(
             account=account,
             transaction_type=BalanceTransaction.TransactionType.LOAD,
@@ -150,16 +181,17 @@ class ManagementViewTests(TestCase):
         self.assertContains(response, "Canteen Pricing")
         self.assertNotContains(response, "IEEE pricing")
 
-    def test_account_create_form_shows_nsid_before_student_number(self):
+    def test_account_create_form_uses_nsid_without_student_number(self):
         response = self.client.get(reverse("account-create"))
 
-        content = response.content.decode()
-        self.assertLess(content.index("NSID"), content.index("Student Number"))
-        self.assertEqual(list(AccountForm().fields)[:2], ["nsid", "student_id"])
+        self.assertContains(response, "NSID")
+        self.assertNotContains(response, "Student Number")
+        self.assertEqual(list(AccountForm().fields)[0], "nsid")
+        self.assertNotIn("student_id", AccountForm().fields)
 
     def test_inventory_list_shows_items_to_customers_without_create_link(self):
         customer = User.objects.create_user(username="abc123", password="12345678")
-        Account.objects.create(user=customer, student_id="12345678", first_name="Alex", last_name="Student")
+        Account.objects.create(user=customer, first_name="Alex", last_name="Student", must_change_password=False)
         InventoryItem.objects.create(
             name="Coke",
             quantity_on_hand=24,
@@ -186,6 +218,31 @@ class ManagementViewTests(TestCase):
         self.assertContains(response, "Coke")
         self.assertContains(response, "$1.25")
         self.assertContains(response, reverse("inventory-item-create"))
+
+    def test_inventory_list_search_filters_by_item_name_for_staff(self):
+        InventoryItem.objects.create(
+            name="Coke",
+            quantity_on_hand=24,
+            member_price=Decimal("1.25"),
+            non_member_price=Decimal("1.50"),
+        )
+        InventoryItem.objects.create(
+            name="Chips",
+            quantity_on_hand=10,
+            member_price=Decimal("1.50"),
+            non_member_price=Decimal("2.00"),
+        )
+
+        response = self.client.get(reverse("inventory-item-list"), {"q": "chips"})
+
+        self.assertContains(response, "Chips")
+        self.assertNotContains(response, "Coke")
+        self.assertContains(response, 'name="q"')
+
+    def test_choice_dropdowns_are_marked_for_searchable_enhancement(self):
+        response = self.client.get(reverse("new-sale"))
+
+        self.assertContains(response, 'data-searchable-select="true"')
 
     def test_create_inventory_item(self):
         response = self.client.post(
@@ -214,7 +271,7 @@ class ManagementViewTests(TestCase):
         self.assertRedirects(response, f"{reverse('login')}?next={reverse('new-sale')}")
 
     def test_staff_new_sale_page_shows_account_selection_and_balance_payment(self):
-        Account.objects.create(student_id="12345678", first_name="Alex", last_name="Student")
+        self.create_account(first_name="Alex", last_name="Student")
         InventoryItem.objects.create(
             name="Coke",
             quantity_on_hand=10,
@@ -225,13 +282,13 @@ class ManagementViewTests(TestCase):
         response = self.client.get(reverse("new-sale"))
 
         self.assertContains(response, "New Sale")
-        self.assertContains(response, "12345678 - Alex Student")
+        self.assertContains(response, "Alex Student")
         self.assertContains(response, "Student Balance")
         self.assertContains(response, "Coke")
 
     def test_customer_new_sale_page_uses_own_account_and_shows_balance(self):
         customer = User.objects.create_user(username="abc123", password="12345678")
-        account = Account.objects.create(user=customer, student_id="12345678", first_name="Alex", last_name="Student")
+        account = Account.objects.create(user=customer, first_name="Alex", last_name="Student", must_change_password=False)
         BalanceTransaction.objects.create(
             account=account,
             transaction_type=BalanceTransaction.TransactionType.LOAD,
@@ -256,7 +313,7 @@ class ManagementViewTests(TestCase):
 
     def test_customer_new_sale_warns_when_balance_below_cheapest_item(self):
         customer = User.objects.create_user(username="abc123", password="12345678")
-        account = Account.objects.create(user=customer, student_id="12345678", first_name="Alex", last_name="Student")
+        account = Account.objects.create(user=customer, first_name="Alex", last_name="Student", must_change_password=False)
         BalanceTransaction.objects.create(
             account=account,
             transaction_type=BalanceTransaction.TransactionType.LOAD,
@@ -279,7 +336,7 @@ class ManagementViewTests(TestCase):
 
     def test_customer_new_sale_does_not_warn_when_balance_can_buy_cheapest_item(self):
         customer = User.objects.create_user(username="abc123", password="12345678")
-        account = Account.objects.create(user=customer, student_id="12345678", first_name="Alex", last_name="Student")
+        account = Account.objects.create(user=customer, first_name="Alex", last_name="Student", must_change_password=False)
         BalanceTransaction.objects.create(
             account=account,
             transaction_type=BalanceTransaction.TransactionType.LOAD,
@@ -302,7 +359,7 @@ class ManagementViewTests(TestCase):
         customer = User.objects.create_user(username="abc123", password="12345678")
         account = Account.objects.create(
             user=customer,
-            student_id="12345678",
+            must_change_password=False,
             first_name="Alex",
             last_name="Student",
             is_ieee_member=True,
@@ -340,7 +397,7 @@ class ManagementViewTests(TestCase):
         self.assertEqual(item.quantity_on_hand, 8)
 
     def test_staff_balance_sale_from_web_form_can_select_account(self):
-        account = Account.objects.create(student_id="12345678", first_name="Alex", last_name="Student")
+        account = self.create_account(first_name="Alex", last_name="Student")
         BalanceTransaction.objects.create(
             account=account,
             transaction_type=BalanceTransaction.TransactionType.LOAD,
@@ -371,7 +428,7 @@ class ManagementViewTests(TestCase):
 
     def test_load_balance_page_requires_staff(self):
         customer = User.objects.create_user(username="abc123", password="12345678")
-        Account.objects.create(user=customer, student_id="12345678", first_name="Alex", last_name="Student")
+        Account.objects.create(user=customer, first_name="Alex", last_name="Student", must_change_password=False)
         self.client.force_login(customer)
 
         response = self.client.get(reverse("load-balance"))
@@ -379,15 +436,15 @@ class ManagementViewTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_load_balance_page_shows_active_accounts(self):
-        Account.objects.create(student_id="12345678", first_name="Alex", last_name="Student")
+        self.create_account(first_name="Alex", last_name="Student")
 
         response = self.client.get(reverse("load-balance"))
 
         self.assertContains(response, "Load Account Balance")
-        self.assertContains(response, "12345678 - Alex Student")
+        self.assertContains(response, "Alex Student")
 
     def test_load_balance_from_web_form(self):
-        account = Account.objects.create(student_id="12345678", first_name="Alex", last_name="Student")
+        account = self.create_account(first_name="Alex", last_name="Student")
 
         response = self.client.post(
             reverse("load-balance"),
@@ -408,7 +465,7 @@ class ManagementViewTests(TestCase):
 
     def test_restock_page_requires_staff(self):
         customer = User.objects.create_user(username="abc123", password="12345678")
-        Account.objects.create(user=customer, student_id="12345678", first_name="Alex", last_name="Student")
+        Account.objects.create(user=customer, first_name="Alex", last_name="Student", must_change_password=False)
         self.client.force_login(customer)
 
         response = self.client.get(reverse("restock-create"))
@@ -474,7 +531,7 @@ class ManagementViewTests(TestCase):
 
     def test_reports_page_requires_staff(self):
         customer = User.objects.create_user(username="abc123", password="12345678")
-        Account.objects.create(user=customer, student_id="12345678", first_name="Alex", last_name="Student")
+        Account.objects.create(user=customer, first_name="Alex", last_name="Student", must_change_password=False)
         self.client.force_login(customer)
 
         response = self.client.get(reverse("reports"))
@@ -492,7 +549,7 @@ class ManagementViewTests(TestCase):
         self.assertContains(response, reverse("export-accounts-csv"))
 
     def test_sales_csv_export(self):
-        account = Account.objects.create(student_id="12345678", first_name="Alex", last_name="Student")
+        account = self.create_account(first_name="Alex", last_name="Student")
         item = InventoryItem.objects.create(
             name="Coke",
             quantity_on_hand=10,
@@ -518,12 +575,11 @@ class ManagementViewTests(TestCase):
 
         self.assertEqual(response["Content-Type"], "text/csv")
         content = response.content.decode()
-        self.assertIn("sale_id,created_at,student_id,student_name,payment_method,status,total_amount", content)
-        self.assertIn("12345678", content)
+        self.assertIn("sale_id,created_at,nsid,student_name,payment_method,status,total_amount", content)
         self.assertIn("3.00", content)
 
     def test_balance_loads_csv_export(self):
-        account = Account.objects.create(student_id="12345678", first_name="Alex", last_name="Student")
+        account = self.create_account(first_name="Alex", last_name="Student")
         BalanceTransaction.objects.create(
             account=account,
             transaction_type=BalanceTransaction.TransactionType.LOAD,
@@ -535,7 +591,7 @@ class ManagementViewTests(TestCase):
 
         self.assertEqual(response["Content-Type"], "text/csv")
         content = response.content.decode()
-        self.assertIn("transaction_id,created_at,student_id,student_name,payment_method,amount,note", content)
+        self.assertIn("transaction_id,created_at,nsid,student_name,payment_method,amount,note", content)
         self.assertIn("20.00", content)
 
     def test_inventory_csv_export(self):
@@ -554,14 +610,13 @@ class ManagementViewTests(TestCase):
         self.assertIn("Coke", content)
 
     def test_accounts_csv_export(self):
-        Account.objects.create(student_id="12345678", first_name="Alex", last_name="Student")
+        self.create_account(first_name="Alex", last_name="Student")
 
         response = self.client.get(reverse("export-accounts-csv"))
 
         self.assertEqual(response["Content-Type"], "text/csv")
         content = response.content.decode()
-        self.assertIn("student_id,nsid,first_name,last_name,is_active,is_ieee_member", content)
-        self.assertIn("12345678", content)
+        self.assertIn("nsid,first_name,last_name,is_active,is_ieee_member", content)
 
     def test_restocks_csv_export(self):
         RestockEvent.objects.create(vendor="Costco", subtotal=Decimal("10.00"), total_tax=Decimal("1.10"), total_paid=Decimal("11.10"))

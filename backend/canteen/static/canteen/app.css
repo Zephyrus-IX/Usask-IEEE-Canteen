@@ -226,8 +226,60 @@ th { background: #edf8ff; color: #062454; }
 .cards { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-top: 1.5rem; }
 .card { border: 1px solid #dbeefa; border-radius: .75rem; padding: 1rem; background: rgba(255,255,255,.84); }
 .balance-warning { margin: .75rem 0 0; color: #b42318; font-weight: 800; }
+.alert {
+  margin: 1rem 0;
+  padding: .85rem 1rem;
+  border-radius: 12px;
+  font-weight: 700;
+}
+.alert-error,
+.errorlist,
+.messages li.error {
+  color: #8a1f11;
+  background: #fff0ed;
+  border: 1px solid #f5b5aa;
+  box-shadow: 0 10px 24px rgba(180, 35, 24, .08);
+}
+.temporary-password { font-size: 1.35rem; overflow-wrap: anywhere; }
 form p { max-width: 620px; display: grid; gap: .25rem; }
 input, textarea, select { font: inherit; padding: .55rem .65rem; border: 1px solid #bcd9ee; border-radius: 8px; }
+.search-bar {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: .65rem;
+  margin: 1rem 0;
+}
+.search-bar label {
+  display: grid;
+  gap: .25rem;
+  font-weight: 700;
+}
+.search-bar input[type="search"] { min-width: min(26rem, 100%); }
+.search-select { position: relative; display: grid; gap: .35rem; max-width: 34rem; }
+.native-select-hidden { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.search-select-input { width: 100%; }
+.search-select-list {
+  max-height: 15.5rem;
+  overflow-y: auto;
+  border: 1px solid #bcd9ee;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 14px 28px rgba(4,36,84,.12);
+}
+.search-select-option {
+  display: block;
+  width: 100%;
+  padding: .55rem .7rem;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  color: var(--ieee-ink);
+  text-align: left;
+}
+.search-select-option:hover,
+.search-select-option:focus,
+.search-select-option[aria-selected="true"] { background: #edf8ff; outline: none; }
 button, .button { font: inherit; padding: .65rem .95rem; border-radius: 9px; border: 1px solid #9dcced; background: #fff; color: var(--ieee-ink); text-decoration: none; cursor: pointer; }
 button[type="submit"], .button-primary { background: #005baa; color: #fff; border-color: #005baa; }
 .actions { margin: 1rem 0; }

@@ -5,11 +5,14 @@
 {% block content %}
   <section class="page-panel">
     <h1>Login</h1>
-    <p class="muted">Use your NSID and Student Number to access your canteen account.</p>
+    <p class="muted">Use your NSID and canteen password to access your account.</p>
     <p class="muted">Need an account or balance loaded? Reach out to the IEEE vice-chair.</p>
 
     {% if form.errors %}
-      <p class="muted">Invalid NSID or Student Number. If you do not have an account yet, contact the IEEE vice-chair.</p>
+      <div class="alert alert-error" role="alert">
+        <strong>Login error.</strong>
+        Invalid NSID or password. If you do not have an account yet, contact the IEEE vice-chair.
+      </div>
     {% endif %}
 
     <form method="post">
@@ -20,7 +23,7 @@
         {{ form.username.errors }}
       </p>
       <p>
-        <label for="{{ form.password.id_for_label }}">Student Number</label>
+        <label for="{{ form.password.id_for_label }}">Password</label>
         {{ form.password }}
         {{ form.password.errors }}
       </p>

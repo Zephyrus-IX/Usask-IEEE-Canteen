@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from .models import (
+    Account,
     BalanceTransaction,
     InventoryAdjustment,
     InventoryItem,
@@ -9,7 +10,6 @@ from .models import (
     RestockTaxLine,
     Sale,
     SaleItem,
-    Account,
     TaxRate,
 )
 
@@ -17,7 +17,6 @@ from .models import (
 @admin.register(Account)
 class AccountAdmin(admin.ModelAdmin):
     list_display = (
-        "student_id",
         "user",
         "first_name",
         "last_name",
@@ -27,7 +26,7 @@ class AccountAdmin(admin.ModelAdmin):
         "has_active_ieee_discount",
         "current_balance",
     )
-    search_fields = ("student_id", "user__username", "first_name", "last_name", "ieee_member_id")
+    search_fields = ("user__username", "first_name", "last_name", "ieee_member_id")
     list_filter = ("is_active", "is_ieee_member")
 
 
@@ -61,7 +60,7 @@ class SaleItemInline(admin.TabularInline):
 class SaleAdmin(admin.ModelAdmin):
     list_display = ("id", "account", "payment_method", "status", "total_amount", "created_at")
     list_filter = ("payment_method", "status", "created_at")
-    search_fields = ("account__student_id", "account__first_name", "account__last_name")
+    search_fields = ("account__user__username", "account__first_name", "account__last_name")
     inlines = [SaleItemInline]
 
 
@@ -69,7 +68,7 @@ class SaleAdmin(admin.ModelAdmin):
 class BalanceTransactionAdmin(admin.ModelAdmin):
     list_display = ("account", "transaction_type", "payment_method", "amount", "created_at")
     list_filter = ("transaction_type", "payment_method", "created_at")
-    search_fields = ("account__student_id", "account__first_name", "account__last_name")
+    search_fields = ("account__user__username", "account__first_name", "account__last_name")
 
 
 class RestockItemInline(admin.TabularInline):

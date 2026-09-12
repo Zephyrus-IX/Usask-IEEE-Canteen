@@ -1,15 +1,16 @@
 from datetime import date
 from decimal import Decimal
 
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
 from .models import (
+    Account,
     BalanceTransaction,
     InventoryItem,
     RestockTaxLine,
     Sale,
-    Account,
     TaxRate,
 )
 from .services import adjust_inventory, create_sale, load_student_balance, record_restock
@@ -17,8 +18,9 @@ from .services import adjust_inventory, create_sale, load_student_balance, recor
 
 class CanteenServiceTests(TestCase):
     def setUp(self):
+        customer = User.objects.create_user(username="abc123", password="customer-password")
         self.tab = Account.objects.create(
-            student_id="12345678",
+            user=customer,
             first_name="Alex",
             last_name="Student",
             is_ieee_member=True,
