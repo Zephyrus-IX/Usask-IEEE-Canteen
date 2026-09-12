@@ -9,7 +9,10 @@
     <p class="muted">Need an account or balance loaded? Reach out to the IEEE vice-chair.</p>
 
     {% if form.errors %}
-      <p class="muted">Invalid NSID or password. If you do not have an account yet, contact the IEEE vice-chair.</p>
+      <div class="alert alert-error" role="alert">
+        <strong>Login error.</strong>
+        Invalid NSID or password. If you do not have an account yet, contact the IEEE vice-chair.
+      </div>
     {% endif %}
 
     <form method="post">

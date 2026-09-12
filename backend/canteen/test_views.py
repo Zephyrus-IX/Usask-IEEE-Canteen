@@ -80,6 +80,18 @@ class ManagementViewTests(TestCase):
         self.assertNotContains(response, "Student Number")
         self.assertContains(response, "vice-chair")
 
+    def test_invalid_login_error_is_highlighted_in_red_alert(self):
+        self.client.logout()
+
+        response = self.client.post(
+            reverse("login"),
+            {"username": "missing", "password": "wrong-password"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="alert alert-error"')
+        self.assertContains(response, "Invalid NSID or password")
+
     def test_login_without_next_redirects_to_canteen_home(self):
         self.client.logout()
         User.objects.create_user(username="admin", password="password", is_staff=True)
