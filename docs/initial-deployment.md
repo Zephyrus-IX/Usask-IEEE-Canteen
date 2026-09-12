@@ -15,6 +15,12 @@ If the repository is private, the deployment machine needs GitHub access through
 
 Dockhand reads the committed `.env` template directly. Edit `.env` in Dockhand or on the deployment host before starting the stack. The file contains placeholders only; do not commit real generated secrets back to GitHub.
 
+For a simple first LAN test, the helper can generate the required secrets and update `.env` locally:
+
+```bash
+./canteen install --lan
+```
+
 Required production values:
 
 ```env
@@ -32,12 +38,12 @@ DJANGO_SECURE_HSTS_PRELOAD=0
 POSTGRES_DB=canteen
 POSTGRES_USER=canteen
 POSTGRES_PASSWORD=<strong-database-password>
-DATABASE_URL=postgres://canteen:<strong-database-password>@db:5432/canteen
+DATABASE_URL=postgres://canteen:***@db:5432/canteen
 ```
 
 Notes:
 
-- Generate the Django secret with `python -c "import secrets; print(secrets.token_urlsafe(64))"` and copy the result into `.env`.
+- Generate the Django secret with `python -c "import secrets; print(secrets.token_urlsafe(64))"` and copy the result into `.env`, or let `./canteen install --lan` generate it for a LAN test.
 - The container refuses to start with a missing, placeholder, or short `DJANGO_SECRET_KEY` while `DJANGO_DEBUG=0`.
 - Do not reuse the example database password for a real deployment.
 - Generate a separate database password and URL-encode it when placing it inside `DATABASE_URL`; the Compose stack refuses to start if either database variable is missing.
@@ -52,6 +58,14 @@ Notes:
 For the current plain-HTTP LAN test deployment, explicitly include the LAN override:
 
 ```bash
+./canteen install --lan
+```
+
+The install helper generates first-run secrets when `.env` still contains placeholders, configures LAN-safe HTTP settings, builds the containers, and starts the stack. It does not commit generated secrets.
+
+Equivalent manual command after `.env` has been edited:
+
+```bash
 docker compose -f compose.yaml -f compose.lan.yaml up -d --build
 ```
 
@@ -60,7 +74,7 @@ The base `compose.yaml` exposes Gunicorn only to other containers. This prevents
 Check logs if the web container does not stay up:
 
 ```bash
-docker compose logs web
+./canteen logs --lan
 ```
 
 On startup, the web container applies database migrations, collects static files, and prints a reminder with the first-deploy commands below.
@@ -69,7 +83,7 @@ The application is served by Gunicorn; WhiteNoise serves the collected static fi
 ## 4. Run database migrations
 
 ```bash
-docker compose exec web python manage.py migrate
+docker compose -f compose.yaml -f compose.lan.yaml exec web python manage.py migrate
 ```
 
 Startup already applies migrations. This command is safe to run again and verifies that the Django tables are current.
@@ -77,7 +91,7 @@ Startup already applies migrations. This command is safe to run again and verifi
 ## 5. Create the first Django admin account
 
 ```bash
-docker compose exec web python manage.py createsuperuser
+./canteen createsuperuser --lan
 ```
 
 You will be prompted for:
@@ -129,16 +143,15 @@ Migration `0004` removes Student Number and invalidates passwords for every pre-
 
 ## Useful maintenance commands
 
-## Update procedure without resetting the database
+### Update procedure without resetting the database
 
 For normal updates, do **not** remove volumes. The PostgreSQL data lives in the Docker volume `postgres_data`, and deleting that volume resets accounts, inventory, sales, balances, and the admin user.
 
 Use this update flow from the same repository directory you originally deployed from:
 
 ```bash
-git pull origin dev
-docker compose -f compose.yaml -f compose.lan.yaml up -d --build
-docker compose -f compose.yaml -f compose.lan.yaml logs -f web
+./canteen update --lan
+./canteen logs --lan
 ```
 
 The web container runs migrations and `collectstatic` automatically before Gunicorn starts. You can verify migrations afterward with:
@@ -161,24 +174,50 @@ Destructive reset command:
 docker compose -f compose.yaml -f compose.lan.yaml down -v
 ```
 
+The helper wraps this behind an explicit confirmation prompt:
+
+```bash
+./canteen reset-test-db --lan
+```
+
 Only use `down -v` when you intentionally want to delete the local test database and start over. A plain `docker compose down` should keep the named volume, but deploying from a different folder/project name can create a different Compose volume and make the app look empty. Keep using the same checkout directory, or set a stable project name with `COMPOSE_PROJECT_NAME=usask-ieee-canteen` before the first deploy.
 
 Create another admin user:
 
 ```bash
-docker compose exec web python manage.py createsuperuser
+./canteen createsuperuser --lan
 ```
 
 Change an admin password:
 
 ```bash
-docker compose exec web python manage.py changepassword <username>
+docker compose -f compose.yaml -f compose.lan.yaml exec web python manage.py changepassword <username>
 ```
 
-Apply future database migrations after pulling updates:
+Apply future updates without deleting the database:
 
 ```bash
-git pull
-docker compose -f compose.yaml -f compose.lan.yaml up -d --build
-docker compose exec web python manage.py migrate
+./canteen update --lan
 ```
+
+## Helper command reference
+
+The repository includes a small helper named `canteen` to make onboarding safer for future executives:
+
+```bash
+./canteen install --lan
+./canteen update --lan
+./canteen logs --lan
+./canteen status --lan
+./canteen createsuperuser --lan
+./canteen reset-test-db --lan
+```
+
+For the future Cloudflare production cutover, use production mode with the exact hostname:
+
+```bash
+./canteen install --production --host canteen.example.ca
+./canteen update --production --host canteen.example.ca
+```
+
+Production mode enables Cloudflare/HTTPS-aware settings in `.env`, but keeps HSTS at `0` until the hostname has been tested reliably.
