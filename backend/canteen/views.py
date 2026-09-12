@@ -6,6 +6,7 @@ from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
@@ -349,6 +350,23 @@ class AccountListView(StaffRequiredMixin, LoginRequiredMixin, ListView):
     context_object_name = "accounts"
     paginate_by = 50
 
+    def get_queryset(self):
+        queryset = Account.objects.select_related("user").order_by("user__username")
+        self.search_query = self.request.GET.get("q", "").strip()
+        if self.search_query:
+            queryset = queryset.filter(
+                Q(user__username__icontains=self.search_query)
+                | Q(first_name__icontains=self.search_query)
+                | Q(last_name__icontains=self.search_query)
+                | Q(ieee_member_id__icontains=self.search_query)
+            )
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["search_query"] = self.search_query
+        return context
+
 
 class AccountCreateView(StaffRequiredMixin, LoginRequiredMixin, CreateView):
     model = Account
@@ -399,6 +417,21 @@ class InventoryItemListView(LoginRequiredMixin, ListView):
     template_name = "canteen/inventory_item_list.html"
     context_object_name = "inventory_items"
     paginate_by = 50
+
+    def get_queryset(self):
+        queryset = InventoryItem.objects.order_by("name")
+        self.search_query = self.request.GET.get("q", "").strip()
+        if self.search_query and is_staff_user(self.request.user):
+            queryset = queryset.filter(
+                Q(name__icontains=self.search_query)
+                | Q(notes__icontains=self.search_query)
+            )
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["search_query"] = self.search_query
+        return context
 
 
 class InventoryItemCreateView(StaffRequiredMixin, LoginRequiredMixin, CreateView):

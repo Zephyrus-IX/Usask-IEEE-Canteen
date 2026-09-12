@@ -129,6 +129,40 @@ Migration `0004` removes Student Number and invalidates passwords for every pre-
 
 ## Useful maintenance commands
 
+## Update procedure without resetting the database
+
+For normal updates, do **not** remove volumes. The PostgreSQL data lives in the Docker volume `postgres_data`, and deleting that volume resets accounts, inventory, sales, balances, and the admin user.
+
+Use this update flow from the same repository directory you originally deployed from:
+
+```bash
+git pull origin dev
+docker compose -f compose.yaml -f compose.lan.yaml up -d --build
+docker compose -f compose.yaml -f compose.lan.yaml logs -f web
+```
+
+The web container runs migrations and `collectstatic` automatically before Gunicorn starts. You can verify migrations afterward with:
+
+```bash
+docker compose -f compose.yaml -f compose.lan.yaml exec web python manage.py showmigrations canteen
+```
+
+Safe commands for preserving data:
+
+```bash
+docker compose -f compose.yaml -f compose.lan.yaml stop
+docker compose -f compose.yaml -f compose.lan.yaml down
+docker compose -f compose.yaml -f compose.lan.yaml up -d --build
+```
+
+Destructive reset command:
+
+```bash
+docker compose -f compose.yaml -f compose.lan.yaml down -v
+```
+
+Only use `down -v` when you intentionally want to delete the local test database and start over. A plain `docker compose down` should keep the named volume, but deploying from a different folder/project name can create a different Compose volume and make the app look empty. Keep using the same checkout directory, or set a stable project name with `COMPOSE_PROJECT_NAME=usask-ieee-canteen` before the first deploy.
+
 Create another admin user:
 
 ```bash

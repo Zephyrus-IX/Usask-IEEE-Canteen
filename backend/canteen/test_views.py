@@ -129,6 +129,16 @@ class ManagementViewTests(TestCase):
         self.assertContains(response, "Alex Student")
         self.assertContains(response, reverse("account-create"))
 
+    def test_account_list_search_filters_by_nsid_and_name(self):
+        self.create_account(first_name="Alex", last_name="Student")
+        self.create_account(first_name="Jordan", last_name="Member")
+
+        response = self.client.get(reverse("account-list"), {"q": "jordan"})
+
+        self.assertContains(response, "Jordan Member")
+        self.assertNotContains(response, "Alex Student")
+        self.assertContains(response, 'name="q"')
+
     def test_create_account_generates_temporary_password_for_nsid(self):
         response = self.client.post(
             reverse("account-create"),
@@ -208,6 +218,31 @@ class ManagementViewTests(TestCase):
         self.assertContains(response, "Coke")
         self.assertContains(response, "$1.25")
         self.assertContains(response, reverse("inventory-item-create"))
+
+    def test_inventory_list_search_filters_by_item_name_for_staff(self):
+        InventoryItem.objects.create(
+            name="Coke",
+            quantity_on_hand=24,
+            member_price=Decimal("1.25"),
+            non_member_price=Decimal("1.50"),
+        )
+        InventoryItem.objects.create(
+            name="Chips",
+            quantity_on_hand=10,
+            member_price=Decimal("1.50"),
+            non_member_price=Decimal("2.00"),
+        )
+
+        response = self.client.get(reverse("inventory-item-list"), {"q": "chips"})
+
+        self.assertContains(response, "Chips")
+        self.assertNotContains(response, "Coke")
+        self.assertContains(response, 'name="q"')
+
+    def test_choice_dropdowns_are_marked_for_searchable_enhancement(self):
+        response = self.client.get(reverse("new-sale"))
+
+        self.assertContains(response, 'data-searchable-select="true"')
 
     def test_create_inventory_item(self):
         response = self.client.post(

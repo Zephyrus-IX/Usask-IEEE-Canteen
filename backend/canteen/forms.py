@@ -9,6 +9,16 @@ SALE_ITEM_ROW_COUNT = 5
 RESTOCK_ITEM_ROW_COUNT = 5
 
 
+class SearchableSelect(forms.Select):
+    def __init__(self, attrs=None, choices=()):
+        attrs = {**(attrs or {}), "data-searchable-select": "true"}
+        super().__init__(attrs=attrs, choices=choices)
+
+
+class SearchableModelChoiceField(forms.ModelChoiceField):
+    widget = SearchableSelect
+
+
 class AccountForm(forms.ModelForm):
     nsid = forms.CharField(label="NSID", max_length=150)
 
@@ -97,7 +107,7 @@ class InventoryItemForm(forms.ModelForm):
 
 
 class LoadBalanceForm(forms.Form):
-    account = forms.ModelChoiceField(
+    account = SearchableModelChoiceField(
         queryset=Account.objects.none(),
         label="Account",
     )
@@ -116,7 +126,7 @@ class LoadBalanceForm(forms.Form):
 
 
 class NewSaleForm(forms.Form):
-    account = forms.ModelChoiceField(
+    account = SearchableModelChoiceField(
         queryset=Account.objects.none(),
         label="Account",
         required=False,
@@ -132,7 +142,7 @@ class NewSaleForm(forms.Form):
             self.fields.pop("account")
         item_queryset = InventoryItem.objects.filter(is_active=True, quantity_on_hand__gt=0).order_by("name")
         for row_number in range(1, SALE_ITEM_ROW_COUNT + 1):
-            self.fields[f"item_{row_number}"] = forms.ModelChoiceField(
+            self.fields[f"item_{row_number}"] = SearchableModelChoiceField(
                 queryset=item_queryset,
                 label=f"Item {row_number}",
                 required=False,
@@ -183,7 +193,7 @@ class RestockForm(forms.Form):
         self.fields["tax_rates"].queryset = TaxRate.objects.filter(is_active=True).order_by("name")
         item_queryset = InventoryItem.objects.filter(is_active=True).order_by("name")
         for row_number in range(1, RESTOCK_ITEM_ROW_COUNT + 1):
-            self.fields[f"item_{row_number}"] = forms.ModelChoiceField(
+            self.fields[f"item_{row_number}"] = SearchableModelChoiceField(
                 queryset=item_queryset,
                 label=f"Item {row_number}",
                 required=False,

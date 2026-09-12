@@ -6,6 +6,12 @@
   <section class="page-panel">
     <h1>Accounts</h1>
     <p class="muted">Student accounts are created by IEEE execs. NSID is the login username and a one-time temporary password is generated for first sign-in.</p>
+    <form class="search-bar" method="get" role="search">
+      <label for="account-search">Search accounts</label>
+      <input id="account-search" type="search" name="q" value="{{ search_query }}" placeholder="Search NSID, name, or IEEE member ID">
+      <button type="submit">Search</button>
+      {% if search_query %}<a class="button" href="{% url 'account-list' %}">Clear</a>{% endif %}
+    </form>
     <p class="actions"><a class="button" href="{% url 'account-create' %}">Create account</a></p>
 
     <table>
@@ -36,7 +42,7 @@
             <td>${{ account.current_balance }}</td>
           </tr>
         {% empty %}
-          <tr><td colspan="5">No accounts yet.</td></tr>
+          <tr><td colspan="5">No accounts match your search.</td></tr>
         {% endfor %}
       </tbody>
     </table>

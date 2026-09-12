@@ -243,6 +243,43 @@ th { background: #edf8ff; color: #062454; }
 .temporary-password { font-size: 1.35rem; overflow-wrap: anywhere; }
 form p { max-width: 620px; display: grid; gap: .25rem; }
 input, textarea, select { font: inherit; padding: .55rem .65rem; border: 1px solid #bcd9ee; border-radius: 8px; }
+.search-bar {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: .65rem;
+  margin: 1rem 0;
+}
+.search-bar label {
+  display: grid;
+  gap: .25rem;
+  font-weight: 700;
+}
+.search-bar input[type="search"] { min-width: min(26rem, 100%); }
+.search-select { position: relative; display: grid; gap: .35rem; max-width: 34rem; }
+.native-select-hidden { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.search-select-input { width: 100%; }
+.search-select-list {
+  max-height: 15.5rem;
+  overflow-y: auto;
+  border: 1px solid #bcd9ee;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 14px 28px rgba(4,36,84,.12);
+}
+.search-select-option {
+  display: block;
+  width: 100%;
+  padding: .55rem .7rem;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  color: var(--ieee-ink);
+  text-align: left;
+}
+.search-select-option:hover,
+.search-select-option:focus,
+.search-select-option[aria-selected="true"] { background: #edf8ff; outline: none; }
 button, .button { font: inherit; padding: .65rem .95rem; border-radius: 9px; border: 1px solid #9dcced; background: #fff; color: var(--ieee-ink); text-decoration: none; cursor: pointer; }
 button[type="submit"], .button-primary { background: #005baa; color: #fff; border-color: #005baa; }
 .actions { margin: 1rem 0; }
