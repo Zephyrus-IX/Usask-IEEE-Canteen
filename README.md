@@ -34,7 +34,7 @@ compose.yaml         Local/self-hosted Docker Compose stack
 compose.lan.yaml     Explicit host-port override for temporary LAN testing
 docs/                Design notes, deployment guide, and MVP scope
 .env                 Dockhand environment template with placeholder values
-canteen              Deployment helper for install/update/admin commands
+docker-canteen       Docker CLI plugin source for install/update/admin commands
 ```
 
 ## Deployment
@@ -43,17 +43,25 @@ See [docs/initial-deployment.md](docs/initial-deployment.md) for first-deploy se
 
 Future work, including encrypted PostgreSQL exports to removable USB storage, is tracked in [docs/roadmap.md](docs/roadmap.md).
 
+Install the helper once from the cloned repo:
+
+```bash
+./docker-canteen install-plugin
+```
+
 Quick start for laptop/LAN testing:
 
 ```bash
-./canteen install --lan
-./canteen logs --lan
-./canteen createsuperuser --lan
+docker canteen install
+docker canteen logs --lan
+docker canteen createsuperuser --lan
 ```
+
+The installer asks whether this is a LAN test or production Cloudflare deployment, and asks whether to deploy from `main` or `dev`. Normal deployed systems should track `main`; test deployments can choose `dev`.
 
 The LAN override publishes port `8000` only for pre-tunnel testing. The base Compose file keeps Gunicorn internal so a future `cloudflared` service can reach `web:8000` without creating a direct public origin bypass.
 
-Use `./canteen update --lan` for normal laptop/LAN updates. It pulls the latest code and rebuilds without deleting the PostgreSQL volume. Only use `./canteen reset-test-db --lan` when you intentionally want to wipe local test data.
+Use `docker canteen update` for normal updates. It fetches the selected branch and rebuilds only when the remote branch is ahead. It does not delete the PostgreSQL volume. Only use `docker canteen reset-test-db --lan` when you intentionally want to wipe local test data.
 
 ## Development status
 

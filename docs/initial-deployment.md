@@ -11,15 +11,33 @@ cd Usask-IEEE-Canteen
 
 If the repository is private, the deployment machine needs GitHub access through a user account, a fine-grained read-only token, or a read-only deploy key.
 
-## 2. Configure the environment file
+## 2. Install the `docker canteen` helper
+
+Install the Docker CLI plugin once from the cloned repository:
+
+```bash
+./docker-canteen install-plugin
+```
+
+After that, run canteen deployment commands as Docker subcommands:
+
+```bash
+docker canteen --help
+```
+
+The plugin stores the repository path under the current user's config directory, so future `docker canteen ...` commands can be run from outside the repository. You can override the path with `CANTEEN_REPO=/path/to/Usask-IEEE-Canteen` if needed.
+
+## 3. Configure the environment file
 
 Dockhand reads the committed `.env` template directly. Edit `.env` in Dockhand or on the deployment host before starting the stack. The file contains placeholders only; do not commit real generated secrets back to GitHub.
 
 For a simple first LAN test, the helper can generate the required secrets and update `.env` locally:
 
 ```bash
-./canteen install --lan
+docker canteen install
 ```
+
+The install helper is interactive. It asks whether this is a LAN test or a production Cloudflare deployment, and asks whether to deploy from `main` or `dev`. Normal deployed systems should track `main`; test deployments can choose `dev`.
 
 Required production values:
 
@@ -43,7 +61,7 @@ DATABASE_URL=postgres://canteen:***@db:5432/canteen
 
 Notes:
 
-- Generate the Django secret with `python -c "import secrets; print(secrets.token_urlsafe(64))"` and copy the result into `.env`, or let `./canteen install --lan` generate it for a LAN test.
+- Generate the Django secret with `python -c "import secrets; print(secrets.token_urlsafe(64))"` and copy the result into `.env`, or let `docker canteen install` generate it during setup.
 - The container refuses to start with a missing, placeholder, or short `DJANGO_SECRET_KEY` while `DJANGO_DEBUG=0`.
 - Do not reuse the example database password for a real deployment.
 - Generate a separate database password and URL-encode it when placing it inside `DATABASE_URL`; the Compose stack refuses to start if either database variable is missing.
@@ -53,15 +71,15 @@ Notes:
 - At the Cloudflare Tunnel cutover, set the exact public hostname in `DJANGO_ALLOWED_HOSTS`, set `DJANGO_CSRF_TRUSTED_ORIGINS=https://<exact-hostname>`, and set `DJANGO_TRUST_CLOUDFLARE_HEADERS=1`, `DJANGO_SECURE_COOKIES=1`, and `DJANGO_SECURE_SSL_REDIRECT=1`.
 - Leave HSTS disabled until the exact HTTPS hostname has been tested. Enable it gradually afterward; do not enable subdomain coverage or preload without reviewing every affected hostname.
 
-## 3. Build and start Docker Compose
+## 4. Build and start Docker Compose
 
-For the current plain-HTTP LAN test deployment, explicitly include the LAN override:
+For the current plain-HTTP LAN test deployment, use:
 
 ```bash
-./canteen install --lan
+docker canteen install
 ```
 
-The install helper generates first-run secrets when `.env` still contains placeholders, configures LAN-safe HTTP settings, builds the containers, and starts the stack. It does not commit generated secrets.
+The install helper generates first-run secrets when `.env` still contains placeholders, configures LAN-safe HTTP settings if you select LAN mode, builds the containers, and starts the stack. It does not commit generated secrets.
 
 Equivalent manual command after `.env` has been edited:
 
@@ -74,13 +92,13 @@ The base `compose.yaml` exposes Gunicorn only to other containers. This prevents
 Check logs if the web container does not stay up:
 
 ```bash
-./canteen logs --lan
+docker canteen logs --lan
 ```
 
 On startup, the web container applies database migrations, collects static files, and prints a reminder with the first-deploy commands below.
 The application is served by Gunicorn; WhiteNoise serves the collected static files.
 
-## 4. Run database migrations
+## 5. Run database migrations
 
 ```bash
 docker compose -f compose.yaml -f compose.lan.yaml exec web python manage.py migrate
@@ -88,10 +106,10 @@ docker compose -f compose.yaml -f compose.lan.yaml exec web python manage.py mig
 
 Startup already applies migrations. This command is safe to run again and verifies that the Django tables are current.
 
-## 5. Create the first Django admin account
+## 6. Create the first Django admin account
 
 ```bash
-./canteen createsuperuser --lan
+docker canteen createsuperuser --lan
 ```
 
 You will be prompted for:
@@ -105,7 +123,7 @@ Password again:
 
 Use a named IEEE exec/admin account rather than a shared password when possible. Add more users later through Django admin.
 
-## 6. Log in to Django admin
+## 7. Log in to Django admin
 
 Open:
 
@@ -125,7 +143,7 @@ The canteen models currently registered in Django admin include:
 - Restock events
 - Inventory adjustments
 
-## 7. Initial app setup checklist
+## 8. Initial app setup checklist
 
 After the first admin login:
 
@@ -147,12 +165,14 @@ Migration `0004` removes Student Number and invalidates passwords for every pre-
 
 For normal updates, do **not** remove volumes. The PostgreSQL data lives in the Docker volume `postgres_data`, and deleting that volume resets accounts, inventory, sales, balances, and the admin user.
 
-Use this update flow from the same repository directory you originally deployed from:
+Use this update flow:
 
 ```bash
-./canteen update --lan
-./canteen logs --lan
+docker canteen update
+docker canteen logs --lan
 ```
+
+The update helper asks which branch to track. Normal deployed systems should use `main`; test deployments can use `dev`. It fetches the selected branch and rebuilds only when the remote branch is ahead unless `--force` is used.
 
 The web container runs migrations and `collectstatic` automatically before Gunicorn starts. You can verify migrations afterward with:
 
@@ -177,7 +197,7 @@ docker compose -f compose.yaml -f compose.lan.yaml down -v
 The helper wraps this behind an explicit confirmation prompt:
 
 ```bash
-./canteen reset-test-db --lan
+docker canteen reset-test-db --lan
 ```
 
 Only use `down -v` when you intentionally want to delete the local test database and start over. A plain `docker compose down` should keep the named volume, but deploying from a different folder/project name can create a different Compose volume and make the app look empty. Keep using the same checkout directory, or set a stable project name with `COMPOSE_PROJECT_NAME=usask-ieee-canteen` before the first deploy.
@@ -185,7 +205,7 @@ Only use `down -v` when you intentionally want to delete the local test database
 Create another admin user:
 
 ```bash
-./canteen createsuperuser --lan
+docker canteen createsuperuser --lan
 ```
 
 Change an admin password:
@@ -197,27 +217,29 @@ docker compose -f compose.yaml -f compose.lan.yaml exec web python manage.py cha
 Apply future updates without deleting the database:
 
 ```bash
-./canteen update --lan
+docker canteen update
 ```
 
 ## Helper command reference
 
-The repository includes a small helper named `canteen` to make onboarding safer for future executives:
+The repository includes a Docker CLI plugin source named `docker-canteen` to make onboarding safer for future executives:
 
 ```bash
-./canteen install --lan
-./canteen update --lan
-./canteen logs --lan
-./canteen status --lan
-./canteen createsuperuser --lan
-./canteen reset-test-db --lan
+./docker-canteen install-plugin
+
+docker canteen install
+docker canteen update
+docker canteen logs --lan
+docker canteen status --lan
+docker canteen createsuperuser --lan
+docker canteen reset-test-db --lan
 ```
 
-For the future Cloudflare production cutover, use production mode with the exact hostname:
+For the future Cloudflare production cutover, choose production mode during the prompt or pass the exact hostname directly:
 
 ```bash
-./canteen install --production --host canteen.example.ca
-./canteen update --production --host canteen.example.ca
+docker canteen install --production --host canteen.example.ca --branch main
+docker canteen update --production --host canteen.example.ca --branch main
 ```
 
 Production mode enables Cloudflare/HTTPS-aware settings in `.env`, but keeps HSTS at `0` until the hostname has been tested reliably.
