@@ -92,7 +92,7 @@ The base `compose.yaml` exposes Gunicorn only to other containers. This prevents
 Check logs if the web container does not stay up:
 
 ```bash
-docker canteen logs --lan
+docker canteen logs
 ```
 
 On startup, the web container applies database migrations, collects static files, and prints a reminder with the first-deploy commands below.
@@ -109,7 +109,7 @@ Startup already applies migrations. This command is safe to run again and verifi
 ## 6. Create the first Django admin account
 
 ```bash
-docker canteen createsuperuser --lan
+docker canteen createsuperuser
 ```
 
 You will be prompted for:
@@ -169,10 +169,10 @@ Use this update flow:
 
 ```bash
 docker canteen update
-docker canteen logs --lan
+docker canteen logs
 ```
 
-The update helper asks which branch to track. Normal deployed systems should use `main`; test deployments can use `dev`. It fetches the selected branch and rebuilds only when the remote branch is ahead unless `--force` is used.
+The update helper uses the branch selected during install. Normal deployed systems should use `main`; test deployments can use `dev`. It fetches the selected branch and rebuilds only when the remote branch is ahead unless `--force` is used.
 
 The web container runs migrations and `collectstatic` automatically before Gunicorn starts. You can verify migrations afterward with:
 
@@ -197,7 +197,7 @@ docker compose -f compose.yaml -f compose.lan.yaml down -v
 The helper wraps this behind an explicit confirmation prompt:
 
 ```bash
-docker canteen reset-test-db --lan
+docker canteen reset-test-db
 ```
 
 Only use `down -v` when you intentionally want to delete the local test database and start over. A plain `docker compose down` should keep the named volume, but deploying from a different folder/project name can create a different Compose volume and make the app look empty. Keep using the same checkout directory, or set a stable project name with `COMPOSE_PROJECT_NAME=usask-ieee-canteen` before the first deploy.
@@ -205,7 +205,7 @@ Only use `down -v` when you intentionally want to delete the local test database
 Create another admin user:
 
 ```bash
-docker canteen createsuperuser --lan
+docker canteen createsuperuser
 ```
 
 Change an admin password:
@@ -222,24 +222,24 @@ docker canteen update
 
 ## Helper command reference
 
-The repository includes a Docker CLI plugin source named `docker-canteen` to make onboarding safer for future executives:
+The repository includes a Docker CLI plugin source named `docker-canteen` to make onboarding safer for future executives. Run `install` once; after that, the chosen deployment mode and branch are remembered, so normal commands do not need `--lan` or `--production`:
 
 ```bash
 ./docker-canteen install-plugin
 
 docker canteen install
 docker canteen update
-docker canteen logs --lan
-docker canteen status --lan
-docker canteen createsuperuser --lan
-docker canteen reset-test-db --lan
+docker canteen logs
+docker canteen status
+docker canteen createsuperuser
+docker canteen reset-test-db
 ```
 
-For the future Cloudflare production cutover, choose production mode during the prompt or pass the exact hostname directly:
+For the future Cloudflare production cutover, choose production mode during the prompt or pass the exact hostname directly during install:
 
 ```bash
-docker canteen install --production --host canteen.example.ca --branch main
-docker canteen update --production --host canteen.example.ca --branch main
+docker canteen install --mode production --host canteen.example.ca --branch main
+docker canteen update --branch main
 ```
 
 Production mode enables Cloudflare/HTTPS-aware settings in `.env`, but keeps HSTS at `0` until the hostname has been tested reliably.

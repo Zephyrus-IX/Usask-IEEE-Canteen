@@ -53,15 +53,15 @@ Quick start for laptop/LAN testing:
 
 ```bash
 docker canteen install
-docker canteen logs --lan
-docker canteen createsuperuser --lan
+docker canteen logs
+docker canteen createsuperuser
 ```
 
 The installer asks whether this is a LAN test or production Cloudflare deployment, and asks whether to deploy from `main` or `dev`. Normal deployed systems should track `main`; test deployments can choose `dev`.
 
 The LAN override publishes port `8000` only for pre-tunnel testing. The base Compose file keeps Gunicorn internal so a future `cloudflared` service can reach `web:8000` without creating a direct public origin bypass.
 
-Use `docker canteen update` for normal updates. It fetches the selected branch and rebuilds only when the remote branch is ahead. It does not delete the PostgreSQL volume. Only use `docker canteen reset-test-db --lan` when you intentionally want to wipe local test data.
+Use `docker canteen update` for normal updates. It fetches the selected branch and rebuilds only when the remote branch is ahead. It does not delete the PostgreSQL volume. Only use `docker canteen reset-test-db` when you intentionally want to wipe local test data.
 
 ## Development status
 
