@@ -1,4 +1,5 @@
 {% extends "canteen/base.html" %}
+{% load static %}
 
 {% block title %}New Sale · Usask IEEE Canteen{% endblock %}
 
@@ -33,7 +34,7 @@
         <p><strong>Payment method:</strong> Student Balance</p>
       {% endif %}
 
-      <table>
+      <table data-sale-line-table>
         <thead>
           <tr>
             <th>Item</th>
@@ -50,7 +51,26 @@
         </tbody>
       </table>
 
+      <template id="sale-line-template">
+        <tr>
+          <td>
+            <select name="item___prefix__" id="id_item___prefix__" data-searchable-select="true">
+              <option value="" selected>---------</option>
+              {% for choice_value, choice_label in form.empty_item_field.choices %}
+                {% if choice_value %}<option value="{{ choice_value }}">{{ choice_label }}</option>{% endif %}
+              {% endfor %}
+            </select>
+          </td>
+          <td><input type="number" name="quantity___prefix__" id="id_quantity___prefix__" min="1"></td>
+        </tr>
+      </template>
+
+      <p class="actions"><button type="button" data-add-sale-line>Add another item</button></p>
       <p><button type="submit">Complete sale</button></p>
     </form>
   </section>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script src="{% static 'canteen/sale-line-items.js' %}" defer></script>
 {% endblock %}

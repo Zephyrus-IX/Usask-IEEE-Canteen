@@ -234,6 +234,8 @@ docker canteen update
 docker canteen logs
 docker canteen status
 docker canteen createsuperuser
+docker canteen backup
+docker canteen restore
 docker canteen reset-test-db
 ```
 
@@ -245,3 +247,21 @@ docker canteen update --branch main
 ```
 
 Production mode enables Cloudflare/HTTPS-aware settings in `.env`, but keeps HSTS at `0` until the hostname has been tested reliably.
+
+## Local USB database backup and restore
+
+Full database backups are intentionally not exposed as web downloads. Run them from the mini PC or laptop that hosts Docker and write them directly to mounted local USB/removable storage:
+
+```bash
+docker canteen backup /path/to/usb/backups
+```
+
+The helper writes a PostgreSQL custom-format dump named like `canteen-YYYYMMDDTHHMMSSZ.dump`. It refuses destinations that are not detected by the host as USB/removable storage.
+
+Restore after a machine failure or redeployment from a backup file on the USB drive:
+
+```bash
+docker canteen restore /path/to/usb/backups/canteen-YYYYMMDDTHHMMSSZ.dump
+```
+
+Restore stops the web container, imports the dump with `pg_restore --clean --if-exists --no-owner`, then starts the app again. It requires typing `RESTORE` unless `--yes-restore` is used for a scripted recovery. After restore, verify login, accounts, inventory, balances, and recent sales before resuming use.

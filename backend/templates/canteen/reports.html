@@ -13,4 +13,16 @@
     <a class="card" href="{% url 'export-inventory-csv' %}">Export Inventory CSV</a>
     <a class="card" href="{% url 'export-accounts-csv' %}">Export Accounts CSV</a>
   </section>
+
+  <section class="card">
+    <h2>Full database backup and restore</h2>
+    <p>
+      Full system backups are intentionally handled on the deployment computer with a local USB drive.
+      They are not downloadable from the web app.
+    </p>
+    <pre><code>docker canteen backup
+
+docker canteen restore</code></pre>
+    <p class="muted">Use these commands on the machine running Docker. The helper refuses backup/restore paths that are not detected as local USB/removable storage.</p>
+  </section>
 {% endblock %}

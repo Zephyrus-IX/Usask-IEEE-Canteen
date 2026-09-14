@@ -12,7 +12,7 @@ function enhanceSelect(select) {
   search.placeholder = "Type to search...";
 
   const list = document.createElement("div");
-  list.className = "search-select-list";
+  list.className = "search-select-list is-collapsed";
   list.setAttribute("role", "listbox");
 
   select.classList.add("native-select-hidden");
@@ -27,6 +27,14 @@ function enhanceSelect(select) {
 
   function selectedOption() {
     return select.options[select.selectedIndex];
+  }
+
+  function openList() {
+    list.classList.remove("is-collapsed");
+  }
+
+  function closeList() {
+    list.classList.add("is-collapsed");
   }
 
   function render() {
@@ -46,18 +54,28 @@ function enhanceSelect(select) {
           search.value = optionLabel(option);
           select.dispatchEvent(new Event("change", { bubbles: true }));
           render();
+          closeList();
         });
         list.appendChild(button);
       });
   }
 
-  search.addEventListener("input", render);
-  search.addEventListener("focus", render);
+  search.addEventListener("input", () => {
+    render();
+    openList();
+  });
+  search.addEventListener("focus", () => {
+    render();
+    openList();
+  });
   search.addEventListener("keydown", (event) => {
     const options = Array.from(list.querySelectorAll(".search-select-option"));
     if (event.key === "ArrowDown" && options.length) {
       event.preventDefault();
+      openList();
       options[0].focus();
+    } else if (event.key === "Escape") {
+      closeList();
     }
   });
   list.addEventListener("keydown", (event) => {
@@ -70,13 +88,25 @@ function enhanceSelect(select) {
       event.preventDefault();
       if (index <= 0) search.focus();
       else options[index - 1].focus();
+    } else if (event.key === "Enter" && document.activeElement.classList.contains("search-select-option")) {
+      event.preventDefault();
+      document.activeElement.click();
+    } else if (event.key === "Escape") {
+      closeList();
+      search.focus();
     }
+  });
+  document.addEventListener("click", (event) => {
+    if (!wrapper.contains(event.target)) closeList();
   });
 
   const initial = selectedOption();
   if (initial && initial.value) search.value = optionLabel(initial);
   render();
+  closeList();
 }
+
+window.enhanceSearchableSelect = enhanceSelect;
 
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll('select[data-searchable-select="true"]').forEach(enhanceSelect);

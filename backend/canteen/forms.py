@@ -1,3 +1,5 @@
+import re
+
 from django import forms
 from django.contrib.auth.forms import SetPasswordForm
 from django.contrib.auth.models import User
@@ -5,8 +7,9 @@ from django.contrib.auth.models import User
 from .credentials import generate_temporary_password
 from .models import Account, BalanceTransaction, InventoryItem, TaxRate
 
-SALE_ITEM_ROW_COUNT = 5
+SALE_ITEM_ROW_COUNT = 8
 RESTOCK_ITEM_ROW_COUNT = 5
+SALE_ITEM_FIELD_RE = re.compile(r"^item_(\d+)$")
 
 
 class SearchableSelect(forms.Select):
@@ -94,7 +97,6 @@ class InventoryItemForm(forms.ModelForm):
         model = InventoryItem
         fields = [
             "name",
-            "quantity_on_hand",
             "member_price",
             "non_member_price",
             "low_stock_threshold",
@@ -140,8 +142,9 @@ class NewSaleForm(forms.Form):
             self.fields["account"].queryset = Account.objects.filter(is_active=True).order_by("user__username")
         else:
             self.fields.pop("account")
+        self.row_numbers = self.sale_row_numbers()
         item_queryset = InventoryItem.objects.filter(is_active=True, quantity_on_hand__gt=0).order_by("name")
-        for row_number in range(1, SALE_ITEM_ROW_COUNT + 1):
+        for row_number in self.row_numbers:
             self.fields[f"item_{row_number}"] = SearchableModelChoiceField(
                 queryset=item_queryset,
                 label=f"Item {row_number}",
@@ -152,18 +155,40 @@ class NewSaleForm(forms.Form):
                 label="Qty",
                 required=False,
             )
+        self.empty_item_field = SearchableModelChoiceField(
+            queryset=item_queryset,
+            label="Item __prefix__",
+            required=False,
+        )
+        self.empty_item_field.widget.attrs.update({"name": "item___prefix__", "id": "id_item___prefix__"})
+        self.empty_quantity_field = forms.IntegerField(
+            min_value=1,
+            label="Qty",
+            required=False,
+        )
+        self.empty_quantity_field.widget.attrs.update({"name": "quantity___prefix__", "id": "id_quantity___prefix__"})
+
+    def sale_row_numbers(self):
+        data = self.data if self.is_bound else {}
+        posted_numbers = {
+            int(match.group(1))
+            for key in data
+            if (match := SALE_ITEM_FIELD_RE.match(key))
+        }
+        visible_numbers = set(range(1, SALE_ITEM_ROW_COUNT + 1))
+        return sorted(visible_numbers | posted_numbers)
 
     @property
     def item_rows(self):
         return [
             (self[f"item_{row_number}"], self[f"quantity_{row_number}"])
-            for row_number in range(1, SALE_ITEM_ROW_COUNT + 1)
+            for row_number in self.row_numbers
         ]
 
     def clean(self):
         cleaned_data = super().clean()
         items = []
-        for row_number in range(1, SALE_ITEM_ROW_COUNT + 1):
+        for row_number in self.row_numbers:
             item = cleaned_data.get(f"item_{row_number}")
             quantity = cleaned_data.get(f"quantity_{row_number}")
             if item and not quantity:

@@ -16,6 +16,7 @@ A self-hosted Docker app to manage and track inventory, in-person sales, student
 - Restocks are manually entered and increase inventory
 - Restock GST/PST/LST tracking with configurable tax rates
 - CSV exports for sales, balances, restocks, inventory, and student accounts
+- Full PostgreSQL backup/restore through `docker canteen backup` and `docker canteen restore`, restricted to local USB/removable storage
 - Web UI first, CLI/TUI fallback later
 
 ## Planned stack

@@ -2,14 +2,19 @@
 
 ## Database backup export to removable USB storage
 
-Status: deferred until after the public-deployment hardening work.
+Status: basic local USB backup/restore helper implemented; encryption, checksum read-back, retention rules, and safe-eject guidance remain future hardening work.
 
-Build an executive-only workflow that creates a PostgreSQL logical backup and exports it to an explicitly selected removable USB drive.
+The deployed helper creates a PostgreSQL logical backup from the Docker host and writes it directly to an explicitly selected local USB/removable drive. Backups are not downloadable from the web app.
 
-Required safeguards:
+Implemented safeguards:
 
-- Detect removable storage and require an executive to select the destination; never guess a mount path.
-- Run `pg_dump` in PostgreSQL custom format so restores can be validated with `pg_restore`.
+- Detect removable storage and require an operator to select the destination; never guess a mount path.
+- Run `pg_dump` in PostgreSQL custom format so restores can be imported with `pg_restore`.
+- Write to a temporary filename and rename only after a non-empty dump succeeds.
+- Require typed confirmation before database restore.
+
+Remaining safeguards:
+
 - Encrypt every backup before it is written to removable storage; do not store the encryption key on the same USB drive.
 - Use an IEEE-controlled password manager or recovery process for the encryption key.
 - Name backups with an unambiguous UTC timestamp and deployment identifier.
