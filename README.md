@@ -32,7 +32,8 @@ A self-hosted Docker app to manage and track inventory, in-person sales, student
 ```text
 backend/             Django project and canteen app
 compose.yaml         Local/self-hosted Docker Compose stack
-compose.lan.yaml     Explicit host-port override for temporary LAN testing
+compose.lan.yaml     Explicit host-port override for test/localhost use
+compose.deploy.yaml  External ingress-network attachment for Cloudflare/Caddy stacks
 docs/                Design notes, deployment guide, and MVP scope
 .env                 Dockhand environment template with placeholder values
 docker-canteen       Docker CLI plugin source for install/update/admin commands
@@ -58,9 +59,9 @@ docker canteen logs
 docker canteen createsuperuser
 ```
 
-The installer asks whether this is a LAN test or production Cloudflare deployment, and asks whether to deploy from `main` or `dev`. Normal deployed systems should track `main`; test deployments can choose `dev`.
+The installer asks whether this is a `test` or `deploy` target, and asks whether to deploy from `main` or `dev`. Normal deployed systems should track `main`; test deployments can choose `dev`.
 
-The LAN override publishes port `8000` only for pre-tunnel testing. The base Compose file keeps Gunicorn internal so a future `cloudflared` service can reach `web:8000` without creating a direct public origin bypass.
+`test` mode publishes `localhost:8000` through `compose.lan.yaml` and does not ask for a Cloudflare hostname. `deploy` mode asks for the HTTPS hostname and the Docker network shared with the separate ingress stack, then attaches the canteen web service to that network as `canteen-web`. Configure cloudflared/Caddy to route to `http://canteen-web:8000` from the ingress stack.
 
 Use `docker canteen update` for normal updates. It fetches the selected branch and rebuilds only when the remote branch is ahead. It does not delete the PostgreSQL volume. Only use `docker canteen reset-test-db` when you intentionally want to wipe local test data.
 

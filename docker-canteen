@@ -129,9 +129,20 @@ def run(command: list[str], *, repo: Path, dry_run: bool = False, capture: bool 
 
 def compose_args(config: dict[str, str]) -> list[str]:
     command = ["docker", "compose", "-f", "compose.yaml"]
-    if config.get("mode") == "lan":
+    mode = normalize_mode(config.get("mode", "test"))
+    if mode == "test":
         command.extend(["-f", "compose.lan.yaml"])
+    elif mode == "deploy":
+        command.extend(["-f", "compose.deploy.yaml"])
     return command
+
+
+def normalize_mode(mode: str | None) -> str:
+    if mode == "lan":
+        return "test"
+    if mode == "production":
+        return "deploy"
+    return mode or "test"
 
 
 def prompt_choice(question: str, choices: list[str], *, default: str | None = None) -> str:
@@ -236,7 +247,8 @@ def configure_env(repo: Path, config: dict[str, str], *, dry_run: bool) -> None:
     replacements.setdefault("POSTGRES_DB", postgres_db)
     replacements.setdefault("POSTGRES_USER", postgres_user)
 
-    if config["mode"] == "lan":
+    mode = normalize_mode(config["mode"])
+    if mode == "test":
         replacements.update(
             {
                 "DJANGO_DEBUG": "0",
@@ -263,6 +275,7 @@ def configure_env(repo: Path, config: dict[str, str], *, dry_run: bool) -> None:
                 "DJANGO_SECURE_HSTS_SECONDS": "0",
                 "DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS": "0",
                 "DJANGO_SECURE_HSTS_PRELOAD": "0",
+                "INGRESS_NETWORK": config.get("ingress_network", "ingress"),
             }
         )
 
@@ -344,23 +357,35 @@ def require_setup(config: dict[str, str]) -> None:
     missing = [key for key in ("repo", "mode", "branch") if not config.get(key)]
     if missing:
         abort("deployment is not configured yet. Run `docker canteen install` first.")
+    config["mode"] = normalize_mode(config.get("mode"))
+
+
+def ensure_ingress_network(config: dict[str, str], *, dry_run: bool) -> None:
+    if normalize_mode(config.get("mode")) != "deploy":
+        return
+    network = config.get("ingress_network", "ingress")
+    inspect = subprocess.run(["docker", "network", "inspect", network], check=False, text=True, capture_output=True)
+    if inspect.returncode == 0:
+        return
+    run(["docker", "network", "create", network], repo=Path(config["repo"]), dry_run=dry_run)
 
 
 def interactive_config(repo: Path, args: argparse.Namespace) -> dict[str, str]:
-    mode = args.mode or prompt_choice("Deployment target", ["lan", "production"], default="lan")
-    branch_default = "main" if mode == "production" else "dev"
+    mode = normalize_mode(args.mode) if args.mode else prompt_choice("Deployment target", ["test", "deploy"], default="test")
+    branch_default = "main" if mode == "deploy" else "dev"
     branch = args.branch or prompt_choice("Git branch", ["main", "dev"], default=branch_default)
 
     config = {"repo": str(repo), "mode": mode, "branch": branch}
-    if mode == "lan":
+    if mode == "test":
         if args.allowed_hosts:
             config["allowed_hosts"] = args.allowed_hosts
         elif args.mode or args.dry_run:
             config["allowed_hosts"] = "localhost,127.0.0.1,[::1]"
         else:
-            config["allowed_hosts"] = prompt_text("LAN allowed hosts", default="localhost,127.0.0.1,[::1]")
+            config["allowed_hosts"] = prompt_text("Test allowed hosts", default="localhost,127.0.0.1,[::1]")
     else:
-        config["host"] = args.host or prompt_text("Exact Cloudflare HTTPS hostname", required=True)
+        config["host"] = args.host or prompt_text("Cloudflare HTTPS hostname", required=True)
+        config["ingress_network"] = args.ingress_network or prompt_text("Shared ingress Docker network", default="ingress")
     return config
 
 
@@ -385,6 +410,7 @@ def install(args: argparse.Namespace) -> None:
     checkout_branch(repo, config["branch"], dry_run=args.dry_run)
     configure_env(repo, config, dry_run=args.dry_run)
     write_config(config, dry_run=args.dry_run)
+    ensure_ingress_network(config, dry_run=args.dry_run)
     run(compose_args(config) + ["up", "-d", "--build"], repo=repo, dry_run=args.dry_run)
     print("\nInstall started. Useful next commands:")
     print("  docker canteen logs")
@@ -403,6 +429,7 @@ def update(args: argparse.Namespace) -> None:
         return
     run(["git", "checkout", branch], repo=repo, dry_run=args.dry_run)
     run(["git", "pull", "--ff-only", "origin", branch], repo=repo, dry_run=args.dry_run)
+    ensure_ingress_network(config, dry_run=args.dry_run)
     run(compose_args(config) + ["up", "-d", "--build"], repo=repo, dry_run=args.dry_run)
     if not args.dry_run and args.branch:
         config["branch"] = branch
@@ -435,12 +462,14 @@ def config_show(args: argparse.Namespace) -> None:
     config = read_config()
     require_setup(config)
     print(f"Repository: {config['repo']}")
-    print(f"Deployment: {config['mode']}")
+    print(f"Target:     {normalize_mode(config['mode'])}")
     print(f"Branch:     {config['branch']}")
     if config.get("host"):
         print(f"Hostname:   {config['host']}")
+    if config.get("ingress_network"):
+        print(f"Ingress network: {config['ingress_network']}")
     if config.get("allowed_hosts"):
-        print(f"LAN hosts:  {config['allowed_hosts']}")
+        print(f"Test hosts: {config['allowed_hosts']}")
 
 
 def existing_mount_probe_path(path: Path) -> Path:
@@ -606,8 +635,8 @@ def main() -> None:
             "  docker canteen logs\n"
             "  docker canteen createsuperuser\n"
             "  docker canteen backup\n\n"
-            "After install, the selected deployment mode and branch are remembered. "
-            "Normal commands do not need --lan or --production."
+            "After install, the selected target and branch are remembered. "
+            "Use test for localhost/LAN testing, deploy for Cloudflare HTTPS + shared ingress."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -618,10 +647,15 @@ def main() -> None:
     plugin_parser.set_defaults(func=install_plugin)
 
     install_parser = subparsers.add_parser("install", help="interactive first-time setup and start")
-    install_parser.add_argument("--mode", choices=("lan", "production"), help="skip the deployment target prompt")
+    install_parser.add_argument(
+        "--mode",
+        choices=("test", "deploy", "lan", "production"),
+        help="skip the deployment target prompt; lan/production are accepted as legacy aliases",
+    )
     install_parser.add_argument("--branch", choices=("main", "dev"), help="skip the branch prompt")
-    install_parser.add_argument("--host", help="production HTTPS hostname")
-    install_parser.add_argument("--allowed-hosts", help="LAN hostnames/IPs for DJANGO_ALLOWED_HOSTS")
+    install_parser.add_argument("--host", help="deploy HTTPS hostname, without https://")
+    install_parser.add_argument("--allowed-hosts", help="test hostnames/IPs for DJANGO_ALLOWED_HOSTS")
+    install_parser.add_argument("--ingress-network", help="deploy Docker network shared with the ingress stack")
     install_parser.add_argument("--dry-run", action="store_true", help="show actions without writing .env or starting containers")
     install_parser.set_defaults(func=install)
 

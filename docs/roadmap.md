@@ -50,5 +50,5 @@ Implementation notes for later:
 - Tag images with release versions, e.g. `v1.3.0`, and optionally `latest` only after a stable production release policy exists.
 - Keep `compose.yaml` able to reference the image instead of `build:` for production deployments.
 - Preserve the existing source-build path for development/test deployments until image releases are proven.
-- Update `docker canteen update` so production mode can pull the latest approved image rather than rebuilding locally.
+- Update `docker canteen update` so deploy mode can pull the latest approved image rather than rebuilding locally.
 - Verify image startup with migrations, static assets, login, admin access, and a smoke sale before recommending it for production.

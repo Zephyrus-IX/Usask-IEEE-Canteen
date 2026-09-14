@@ -31,27 +31,28 @@ The plugin stores the repository path under the current user's config directory,
 
 Dockhand reads the committed `.env` template directly. Edit `.env` in Dockhand or on the deployment host before starting the stack. The file contains placeholders only; do not commit real generated secrets back to GitHub.
 
-For a simple first LAN test, the helper can generate the required secrets and update `.env` locally:
+For a simple first test deployment, the helper can generate the required secrets and update `.env` locally:
 
 ```bash
 docker canteen install
 ```
 
-The install helper is interactive. It asks whether this is a LAN test or a production Cloudflare deployment, and asks whether to deploy from `main` or `dev`. Normal deployed systems should track `main`; test deployments can choose `dev`.
+The install helper is interactive. It asks whether this is a `test` or `deploy` target, and asks whether to deploy from `main` or `dev`. `test` configures localhost/LAN HTTP access only. `deploy` configures the Cloudflare HTTPS hostname and attaches the web service to the Docker network shared with the separate ingress stack. Normal deployed systems should track `main`; test deployments can choose `dev`.
 
-Required production values:
+Required deploy values:
 
 ```env
 DJANGO_SECRET_KEY=<generate-a-long-random-secret-of-at-least-50-characters>
 DJANGO_DEBUG=0
-DJANGO_ALLOWED_HOSTS=<server-ip-or-domain>,localhost,127.0.0.1
-DJANGO_CSRF_TRUSTED_ORIGINS=
-DJANGO_TRUST_CLOUDFLARE_HEADERS=0
-DJANGO_SECURE_COOKIES=0
-DJANGO_SECURE_SSL_REDIRECT=0
+DJANGO_ALLOWED_HOSTS=<exact-public-hostname>
+DJANGO_CSRF_TRUSTED_ORIGINS=https://<exact-public-hostname>
+DJANGO_TRUST_CLOUDFLARE_HEADERS=1
+DJANGO_SECURE_COOKIES=1
+DJANGO_SECURE_SSL_REDIRECT=1
 DJANGO_SECURE_HSTS_SECONDS=0
 DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS=0
 DJANGO_SECURE_HSTS_PRELOAD=0
+INGRESS_NETWORK=ingress
 
 POSTGRES_DB=canteen
 POSTGRES_USER=canteen
@@ -67,19 +68,19 @@ Notes:
 - Generate a separate database password and URL-encode it when placing it inside `DATABASE_URL`; the Compose stack refuses to start if either database variable is missing.
 - `DJANGO_ALLOWED_HOSTS` must include the hostname, LAN IP, or domain users will visit.
 - Keep real `.env` values private. The committed `.env` file is a Dockhand template only; do not commit the generated secret values.
-- While testing authenticated pages over plain LAN HTTP, leave secure cookies and HTTPS redirects disabled.
-- At the Cloudflare Tunnel cutover, set the exact public hostname in `DJANGO_ALLOWED_HOSTS`, set `DJANGO_CSRF_TRUSTED_ORIGINS=https://<exact-hostname>`, and set `DJANGO_TRUST_CLOUDFLARE_HEADERS=1`, `DJANGO_SECURE_COOKIES=1`, and `DJANGO_SECURE_SSL_REDIRECT=1`.
+- In `test` mode, secure cookies and HTTPS redirects stay disabled so `http://localhost:8000` works.
+- In `deploy` mode, set the exact public hostname in `DJANGO_ALLOWED_HOSTS`, set `DJANGO_CSRF_TRUSTED_ORIGINS=https://<exact-hostname>`, and set `DJANGO_TRUST_CLOUDFLARE_HEADERS=1`, `DJANGO_SECURE_COOKIES=1`, and `DJANGO_SECURE_SSL_REDIRECT=1`.
 - Leave HSTS disabled until the exact HTTPS hostname has been tested. Enable it gradually afterward; do not enable subdomain coverage or preload without reviewing every affected hostname.
 
 ## 4. Build and start Docker Compose
 
-For the current plain-HTTP LAN test deployment, use:
+For a plain-HTTP test deployment, use:
 
 ```bash
 docker canteen install
 ```
 
-The install helper generates first-run secrets when `.env` still contains placeholders, configures LAN-safe HTTP settings if you select LAN mode, builds the containers, and starts the stack. It does not commit generated secrets.
+The install helper generates first-run secrets when `.env` still contains placeholders, configures localhost-safe HTTP settings if you select `test` mode, builds the containers, and starts the stack. It does not commit generated secrets.
 
 Equivalent manual command after `.env` has been edited:
 
@@ -87,7 +88,7 @@ Equivalent manual command after `.env` has been edited:
 docker compose -f compose.yaml -f compose.lan.yaml up -d --build
 ```
 
-The base `compose.yaml` exposes Gunicorn only to other containers. This prevents bypassing Cloudflare once the tunnel service is added. `compose.lan.yaml` is only for temporary trusted-LAN testing and publishes host port `8000`.
+The base `compose.yaml` exposes Gunicorn only to other containers. `compose.lan.yaml` is used by `test` mode and publishes host port `8000`. `compose.deploy.yaml` is used by `deploy` mode and attaches the canteen web service to the external Docker network named by `INGRESS_NETWORK` so the separate ingress stack can route to `http://canteen-web:8000`.
 
 Check logs if the web container does not stay up:
 
@@ -128,7 +129,7 @@ Use a named IEEE exec/admin account rather than a shared password when possible.
 Open:
 
 ```text
-http://<server-ip-or-domain>:8000/admin/
+http://localhost:8000/admin/
 ```
 
 Use the superuser account created in the previous step.
@@ -224,7 +225,7 @@ docker canteen update
 
 ## Helper command reference
 
-The repository includes a Docker CLI plugin source named `docker-canteen` to make onboarding safer for future executives. Run `install` once; after that, the chosen deployment mode and branch are remembered, so normal commands do not need `--lan` or `--production`:
+The repository includes a Docker CLI plugin source named `docker-canteen` to make onboarding safer for future executives. Run `install` once; after that, the chosen target and branch are remembered, so normal commands do not need repeated mode flags:
 
 ```bash
 ./docker-canteen install-plugin
@@ -239,14 +240,14 @@ docker canteen restore
 docker canteen reset-test-db
 ```
 
-For the future Cloudflare production cutover, choose production mode during the prompt or pass the exact hostname directly during install:
+For Cloudflare deployment, choose `deploy` during the prompt or pass the exact hostname and shared ingress network directly during install:
 
 ```bash
-docker canteen install --mode production --host canteen.example.ca --branch main
+docker canteen install --mode deploy --host canteen.example.ca --ingress-network ingress --branch main
 docker canteen update --branch main
 ```
 
-Production mode enables Cloudflare/HTTPS-aware settings in `.env`, but keeps HSTS at `0` until the hostname has been tested reliably.
+`deploy` mode enables Cloudflare/HTTPS-aware settings in `.env`, creates the shared Docker network if needed, and keeps HSTS at `0` until the hostname has been tested reliably. Your separate ingress stack must also join the same Docker network and route Caddy/cloudflared to `http://canteen-web:8000`.
 
 ## Local USB database backup and restore
 
