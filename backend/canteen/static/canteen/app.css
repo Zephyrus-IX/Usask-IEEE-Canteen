@@ -267,6 +267,7 @@ input, textarea, select { font: inherit; padding: .55rem .65rem; border: 1px sol
   background: #fff;
   box-shadow: 0 14px 28px rgba(4,36,84,.12);
 }
+.search-select-list.is-collapsed { display: none; }
 .search-select-option {
   display: block;
   width: 100%;

@@ -244,12 +244,11 @@ class ManagementViewTests(TestCase):
 
         self.assertContains(response, 'data-searchable-select="true"')
 
-    def test_create_inventory_item(self):
+    def test_create_inventory_item_starts_with_zero_stock(self):
         response = self.client.post(
             reverse("inventory-item-create"),
             {
                 "name": "Coke",
-                "quantity_on_hand": "24",
                 "member_price": "1.25",
                 "non_member_price": "1.50",
                 "low_stock_threshold": "6",
@@ -260,8 +259,14 @@ class ManagementViewTests(TestCase):
 
         self.assertRedirects(response, reverse("inventory-item-list"))
         item = InventoryItem.objects.get(name="Coke")
-        self.assertEqual(item.quantity_on_hand, 24)
+        self.assertEqual(item.quantity_on_hand, 0)
         self.assertEqual(item.member_price, Decimal("1.25"))
+
+    def test_inventory_item_form_does_not_allow_manual_stock_entry(self):
+        response = self.client.get(reverse("inventory-item-create"))
+
+        self.assertNotContains(response, "quantity_on_hand")
+        self.assertNotContains(response, "Quantity on hand")
 
     def test_new_sale_page_requires_login(self):
         self.client.logout()
@@ -426,6 +431,32 @@ class ManagementViewTests(TestCase):
         self.assertEqual(sale.payment_method, Sale.PaymentMethod.BALANCE)
         self.assertEqual(sale.total_amount, Decimal("3.00"))
 
+    def test_staff_balance_sale_from_web_form_accepts_more_than_default_rows(self):
+        account = self.create_account(first_name="Alex", last_name="Student")
+        BalanceTransaction.objects.create(
+            account=account,
+            transaction_type=BalanceTransaction.TransactionType.LOAD,
+            payment_method=BalanceTransaction.PaymentMethod.CASH,
+            amount=Decimal("100.00"),
+        )
+        post_data = {"account": str(account.pk)}
+        for index in range(1, 10):
+            item = InventoryItem.objects.create(
+                name=f"Item {index}",
+                quantity_on_hand=10,
+                member_price=Decimal("1.00"),
+                non_member_price=Decimal("1.00"),
+            )
+            post_data[f"item_{index}"] = str(item.pk)
+            post_data[f"quantity_{index}"] = "1"
+
+        response = self.client.post(reverse("new-sale"), post_data)
+
+        self.assertRedirects(response, reverse("new-sale"))
+        sale = Sale.objects.get()
+        self.assertEqual(sale.items.count(), 9)
+        self.assertEqual(sale.total_amount, Decimal("9.00"))
+
     def test_load_balance_page_requires_staff(self):
         customer = User.objects.create_user(username="abc123", password="12345678")
         Account.objects.create(user=customer, first_name="Alex", last_name="Student", must_change_password=False)
@@ -547,6 +578,8 @@ class ManagementViewTests(TestCase):
         self.assertContains(response, reverse("export-restocks-csv"))
         self.assertContains(response, reverse("export-inventory-csv"))
         self.assertContains(response, reverse("export-accounts-csv"))
+        self.assertContains(response, "docker canteen backup")
+        self.assertContains(response, "not downloadable from the web app")
 
     def test_sales_csv_export(self):
         account = self.create_account(first_name="Alex", last_name="Student")
