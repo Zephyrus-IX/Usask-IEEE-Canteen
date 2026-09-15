@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from .credentials import generate_temporary_password
 from .models import Account, BalanceTransaction, InventoryItem, TaxRate
 
-SALE_ITEM_ROW_COUNT = 8
+SALE_ITEM_ROW_COUNT = 1
 RESTOCK_ITEM_ROW_COUNT = 5
 SALE_ITEM_FIELD_RE = re.compile(r"^item_(\d+)$")
 

@@ -1,4 +1,5 @@
 from decimal import Decimal
+from pathlib import Path
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -244,6 +245,27 @@ class ManagementViewTests(TestCase):
 
         self.assertContains(response, 'data-searchable-select="true"')
 
+    def test_searchable_dropdown_options_overlay_instead_of_expanding_the_form(self):
+        css = (Path(__file__).parent / "static" / "canteen" / "app.css").read_text()
+        rule_start = css.index(".search-select-list {")
+        rule = css[rule_start:css.index("}", rule_start)]
+
+        self.assertIn("position: absolute;", rule)
+        self.assertIn("z-index:", rule)
+        self.assertIn("table[data-sale-line-table] {", css)
+        sale_table_start = css.index("table[data-sale-line-table] {")
+        sale_table_rule = css[sale_table_start:css.index("}", sale_table_start)]
+        self.assertIn("overflow: visible;", sale_table_rule)
+
+    def test_restock_searchable_dropdowns_are_not_clipped_by_the_table(self):
+        css = (Path(__file__).parent / "static" / "canteen" / "app.css").read_text()
+        template = (
+            Path(__file__).parent.parent / "templates" / "canteen" / "restock_form.html"
+        ).read_text()
+
+        self.assertIn("data-searchable-select-table", template)
+        self.assertIn("table[data-searchable-select-table]", css)
+
     def test_create_inventory_item_starts_with_zero_stock(self):
         response = self.client.post(
             reverse("inventory-item-create"),
@@ -290,6 +312,12 @@ class ManagementViewTests(TestCase):
         self.assertContains(response, "Alex Student")
         self.assertContains(response, "Student Balance")
         self.assertContains(response, "Coke")
+
+    def test_new_sale_page_starts_with_one_item_row(self):
+        response = self.client.get(reverse("new-sale"))
+
+        self.assertEqual(response.context["form"].row_numbers, [1])
+        self.assertContains(response, "Add another item")
 
     def test_customer_new_sale_page_uses_own_account_and_shows_balance(self):
         customer = User.objects.create_user(username="abc123", password="12345678")
