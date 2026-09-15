@@ -52,7 +52,7 @@ DJANGO_SECURE_SSL_REDIRECT=1
 DJANGO_SECURE_HSTS_SECONDS=0
 DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS=0
 DJANGO_SECURE_HSTS_PRELOAD=0
-INGRESS_NETWORK=ingress
+INGRESS_NETWORK=ingress_default
 
 POSTGRES_DB=canteen
 POSTGRES_USER=canteen
@@ -243,11 +243,11 @@ docker canteen reset-test-db
 For Cloudflare deployment, choose `deploy` during the prompt or pass the exact hostname and shared ingress network directly during install:
 
 ```bash
-docker canteen install --mode deploy --host canteen.example.ca --ingress-network ingress --branch main
+docker canteen install --mode deploy --host canteen.example.ca --ingress-network ingress_default --branch main
 docker canteen update --branch main
 ```
 
-`deploy` mode enables Cloudflare/HTTPS-aware settings in `.env`, creates the shared Docker network if needed, and keeps HSTS at `0` until the hostname has been tested reliably. Your separate ingress stack must also join the same Docker network and route Caddy/cloudflared to `http://canteen-web:8000`.
+`deploy` mode enables Cloudflare/HTTPS-aware settings in `.env`, requires the shared Docker network to already exist, and keeps HSTS at `0` until the hostname has been tested reliably. A typical Compose project named `ingress` creates `ingress_default`. Your separate ingress stack must join the selected network and route Caddy/cloudflared to `http://canteen-web:8000`.
 
 ## Local USB database backup and restore
 

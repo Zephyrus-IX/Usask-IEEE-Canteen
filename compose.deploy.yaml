@@ -9,4 +9,4 @@ services:
 networks:
   ingress:
     external: true
-    name: ${INGRESS_NETWORK:-ingress}
+    name: ${INGRESS_NETWORK:-ingress_default}

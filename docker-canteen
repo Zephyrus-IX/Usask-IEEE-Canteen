@@ -16,6 +16,7 @@ from secrets import token_urlsafe
 from urllib.parse import quote
 
 APP_NAME = "canteen"
+DEFAULT_INGRESS_NETWORK = "ingress_default"
 CONFIG_DIR = Path.home() / ".config" / APP_NAME
 CONFIG_FILE = CONFIG_DIR / "config.json"
 REPO_FILE = CONFIG_DIR / "repo"
@@ -275,7 +276,7 @@ def configure_env(repo: Path, config: dict[str, str], *, dry_run: bool) -> None:
                 "DJANGO_SECURE_HSTS_SECONDS": "0",
                 "DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS": "0",
                 "DJANGO_SECURE_HSTS_PRELOAD": "0",
-                "INGRESS_NETWORK": config.get("ingress_network", "ingress"),
+                "INGRESS_NETWORK": config.get("ingress_network", DEFAULT_INGRESS_NETWORK),
             }
         )
 
@@ -363,11 +364,14 @@ def require_setup(config: dict[str, str]) -> None:
 def ensure_ingress_network(config: dict[str, str], *, dry_run: bool) -> None:
     if normalize_mode(config.get("mode")) != "deploy":
         return
-    network = config.get("ingress_network", "ingress")
+    network = config.get("ingress_network", DEFAULT_INGRESS_NETWORK)
     inspect = subprocess.run(["docker", "network", "inspect", network], check=False, text=True, capture_output=True)
     if inspect.returncode == 0:
         return
-    run(["docker", "network", "create", network], repo=Path(config["repo"]), dry_run=dry_run)
+    abort(
+        f"shared ingress network {network!r} does not exist. Start the ingress stack first "
+        "or pass its existing Docker network with --ingress-network."
+    )
 
 
 def interactive_config(repo: Path, args: argparse.Namespace) -> dict[str, str]:
@@ -385,7 +389,9 @@ def interactive_config(repo: Path, args: argparse.Namespace) -> dict[str, str]:
             config["allowed_hosts"] = prompt_text("Test allowed hosts", default="localhost,127.0.0.1,[::1]")
     else:
         config["host"] = args.host or prompt_text("Cloudflare HTTPS hostname", required=True)
-        config["ingress_network"] = args.ingress_network or prompt_text("Shared ingress Docker network", default="ingress")
+        config["ingress_network"] = args.ingress_network or prompt_text(
+            "Shared ingress Docker network", default=DEFAULT_INGRESS_NETWORK
+        )
     return config
 
 
