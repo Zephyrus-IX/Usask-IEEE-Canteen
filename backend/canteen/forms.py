@@ -8,8 +8,9 @@ from .credentials import generate_temporary_password
 from .models import Account, BalanceTransaction, InventoryItem, TaxRate
 
 SALE_ITEM_ROW_COUNT = 1
-RESTOCK_ITEM_ROW_COUNT = 5
+RESTOCK_ITEM_ROW_COUNT = 1
 SALE_ITEM_FIELD_RE = re.compile(r"^item_(\d+)$")
+RESTOCK_ITEM_FIELD_RE = re.compile(r"^(?:item|quantity|line_subtotal)_(\d+)$")
 
 
 class SearchableSelect(forms.Select):
@@ -216,8 +217,9 @@ class RestockForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["tax_rates"].queryset = TaxRate.objects.filter(is_active=True).order_by("name")
+        self.row_numbers = self.restock_row_numbers()
         item_queryset = InventoryItem.objects.filter(is_active=True).order_by("name")
-        for row_number in range(1, RESTOCK_ITEM_ROW_COUNT + 1):
+        for row_number in self.row_numbers:
             self.fields[f"item_{row_number}"] = SearchableModelChoiceField(
                 queryset=item_queryset,
                 label=f"Item {row_number}",
@@ -235,6 +237,33 @@ class RestockForm(forms.Form):
                 label="Pre-tax subtotal",
                 required=False,
             )
+        self.empty_item_field = SearchableModelChoiceField(
+            queryset=item_queryset,
+            label="Item __prefix__",
+            required=False,
+        )
+        self.empty_quantity_field = forms.IntegerField(
+            min_value=1,
+            label="Qty",
+            required=False,
+        )
+        self.empty_subtotal_field = forms.DecimalField(
+            min_value=0.01,
+            max_digits=10,
+            decimal_places=2,
+            label="Pre-tax subtotal",
+            required=False,
+        )
+
+    def restock_row_numbers(self):
+        data = self.data if self.is_bound else {}
+        posted_numbers = {
+            int(match.group(1))
+            for key in data
+            if (match := RESTOCK_ITEM_FIELD_RE.match(key))
+        }
+        visible_numbers = set(range(1, RESTOCK_ITEM_ROW_COUNT + 1))
+        return sorted(visible_numbers | posted_numbers)
 
     @property
     def item_rows(self):
@@ -244,13 +273,13 @@ class RestockForm(forms.Form):
                 self[f"quantity_{row_number}"],
                 self[f"line_subtotal_{row_number}"],
             )
-            for row_number in range(1, RESTOCK_ITEM_ROW_COUNT + 1)
+            for row_number in self.row_numbers
         ]
 
     def clean(self):
         cleaned_data = super().clean()
         items = []
-        for row_number in range(1, RESTOCK_ITEM_ROW_COUNT + 1):
+        for row_number in self.row_numbers:
             item = cleaned_data.get(f"item_{row_number}")
             quantity = cleaned_data.get(f"quantity_{row_number}")
             line_subtotal = cleaned_data.get(f"line_subtotal_{row_number}")

@@ -546,6 +546,19 @@ class ManagementViewTests(TestCase):
         self.assertContains(response, "Coke")
         self.assertContains(response, "GST")
 
+    def test_restock_page_starts_with_one_item_row(self):
+        response = self.client.get(reverse("restock-create"))
+
+        self.assertEqual(response.context["form"].row_numbers, [1])
+        self.assertContains(response, "Add another item")
+
+    def test_added_restock_row_focuses_the_visible_search_input(self):
+        script = (
+            Path(__file__).parent / "static" / "canteen" / "restock-line-items.js"
+        ).read_text()
+
+        self.assertIn('row.querySelector(".search-select-input")?.focus();', script)
+
     def test_create_restock_from_web_form(self):
         coke = InventoryItem.objects.create(
             name="Coke",
@@ -587,6 +600,50 @@ class ManagementViewTests(TestCase):
         self.assertEqual(restock.total_tax, Decimal("4.18"))
         self.assertEqual(restock.total_paid, Decimal("42.18"))
         self.assertEqual(RestockTaxLine.objects.filter(restock_event=restock).count(), 2)
+
+    def test_create_restock_accepts_items_added_beyond_the_initial_row(self):
+        post_data = {"vendor": "Costco"}
+        for index in range(1, 7):
+            item = InventoryItem.objects.create(
+                name=f"Item {index}",
+                quantity_on_hand=0,
+                member_price=Decimal("1.00"),
+                non_member_price=Decimal("1.00"),
+            )
+            post_data[f"item_{index}"] = str(item.pk)
+            post_data[f"quantity_{index}"] = "1"
+            post_data[f"line_subtotal_{index}"] = "1.00"
+
+        response = self.client.post(reverse("restock-create"), post_data)
+
+        self.assertRedirects(response, reverse("restock-create"))
+        restock = RestockEvent.objects.get()
+        self.assertEqual(restock.items.count(), 6)
+        self.assertEqual(restock.subtotal, Decimal("6.00"))
+
+    def test_restock_rejects_an_added_row_with_quantity_but_no_item(self):
+        item = InventoryItem.objects.create(
+            name="Coke",
+            quantity_on_hand=0,
+            member_price=Decimal("1.00"),
+            non_member_price=Decimal("1.00"),
+        )
+
+        response = self.client.post(
+            reverse("restock-create"),
+            {
+                "item_1": str(item.pk),
+                "quantity_1": "1",
+                "line_subtotal_1": "1.00",
+                "quantity_2": "2",
+                "line_subtotal_2": "2.00",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Select an item for this row.")
+        self.assertEqual(response.context["form"].row_numbers, [1, 2])
+        self.assertFalse(RestockEvent.objects.exists())
 
     def test_reports_page_requires_staff(self):
         customer = User.objects.create_user(username="abc123", password="12345678")
