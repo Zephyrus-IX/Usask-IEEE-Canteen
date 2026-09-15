@@ -14,7 +14,9 @@ if [ "${DJANGO_DEBUG:-0}" = "0" ]; then
   fi
 fi
 
-python manage.py migrate --noinput
+if [ "${CANTEEN_SKIP_MIGRATIONS:-0}" != "1" ]; then
+  python manage.py migrate --noinput
+fi
 python manage.py collectstatic --noinput
 
 if [ "${CANTEEN_SHOW_DEPLOY_HINT:-1}" != "0" ]; then
@@ -31,7 +33,7 @@ To verify migrations or create the first admin, run:
 
 Then open:
 
-  http://<server-ip-or-domain>:8000/admin/
+  http://localhost:8000/admin/ (when a Compose override publishes local HTTP)
 
 Full guide: docs/initial-deployment.md
 Set CANTEEN_SHOW_DEPLOY_HINT=0 to hide this reminder.

@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 
 
 HELPER_PATH = Path(__file__).resolve().parents[2] / "docker-canteen"
+REPO_PATH = HELPER_PATH.parent
 
 
 class DeploymentHelperTests(TestCase):
@@ -16,6 +17,21 @@ class DeploymentHelperTests(TestCase):
 
     def test_deploy_defaults_to_the_compose_ingress_network_name(self):
         self.assertEqual(self.helper["DEFAULT_INGRESS_NETWORK"], "ingress_default")
+
+    def test_deploy_exposes_a_separate_http_service_on_ipv4_loopback_only(self):
+        compose = (REPO_PATH / "compose.deploy.yaml").read_text()
+
+        self.assertIn("web-local:", compose)
+        self.assertIn('127.0.0.1:8000:8000', compose)
+        self.assertIn('DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1,[::1]"', compose)
+        self.assertIn('DJANGO_SECURE_COOKIES: "0"', compose)
+        self.assertIn('DJANGO_SECURE_SSL_REDIRECT: "0"', compose)
+        self.assertIn('CANTEEN_SKIP_MIGRATIONS: "1"', compose)
+        self.assertIn("condition: service_healthy", compose)
+        entrypoint = (REPO_PATH / "backend" / "docker-entrypoint.sh").read_text()
+        self.assertIn("CANTEEN_SKIP_MIGRATIONS", entrypoint)
+        base_compose = (REPO_PATH / "compose.yaml").read_text()
+        self.assertIn("healthcheck:", base_compose)
 
     def test_deploy_rejects_a_missing_shared_ingress_network(self):
         ensure_ingress_network = self.helper["ensure_ingress_network"]

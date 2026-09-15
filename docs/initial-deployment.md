@@ -88,7 +88,7 @@ Equivalent manual command after `.env` has been edited:
 docker compose -f compose.yaml -f compose.lan.yaml up -d --build
 ```
 
-The base `compose.yaml` exposes Gunicorn only to other containers. `compose.lan.yaml` is used by `test` mode and publishes host port `8000`. `compose.deploy.yaml` is used by `deploy` mode and attaches the canteen web service to the external Docker network named by `INGRESS_NETWORK` so the separate ingress stack can route to `http://canteen-web:8000`.
+The base `compose.yaml` exposes Gunicorn only to other containers. `compose.lan.yaml` is used by `test` mode and publishes host port `8000`. `compose.deploy.yaml` attaches the secure canteen web service to the external Docker network named by `INGRESS_NETWORK` so the separate ingress stack can route to `http://canteen-web:8000`. Deploy mode also starts a separate HTTP service on `127.0.0.1:8000`; it is reachable only from the deployment machine, uses non-secure local cookies, and cannot be reached by other LAN devices.
 
 Check logs if the web container does not stay up:
 

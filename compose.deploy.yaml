@@ -6,6 +6,37 @@ services:
         aliases:
           - canteen-web
 
+  web-local:
+    build: ./backend
+    restart: unless-stopped
+    command:
+      - gunicorn
+      - canteen_project.wsgi:application
+      - --bind=0.0.0.0:8000
+      - --workers=2
+      - --threads=2
+      - --timeout=30
+      - --access-logfile=-
+      - --error-logfile=-
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1,[::1]"
+      DJANGO_CSRF_TRUSTED_ORIGINS: "http://localhost:8000,http://127.0.0.1:8000"
+      DJANGO_TRUST_CLOUDFLARE_HEADERS: "0"
+      DJANGO_SECURE_COOKIES: "0"
+      DJANGO_SECURE_SSL_REDIRECT: "0"
+      CANTEEN_SKIP_MIGRATIONS: "1"
+      CANTEEN_SHOW_DEPLOY_HINT: "0"
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+
 networks:
   ingress:
     external: true
